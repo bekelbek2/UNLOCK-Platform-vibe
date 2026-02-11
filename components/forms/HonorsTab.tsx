@@ -167,7 +167,8 @@ export default function HonorsTab() {
     const [editingHonor, setEditingHonor] = useState<Honor | null>(null);
 
     const form = useForm<HonorFormData>({
-        resolver: zodResolver(honorFormSchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(honorFormSchema) as any,
         defaultValues: {
             title: '',
             gradeLevels: [],

@@ -47,7 +47,8 @@ const COUNTRIES = [
 
 export default function EducationTab() {
     const form = useForm<EducationFormData>({
-        resolver: zodResolver(educationFormSchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(educationFormSchema) as any,
         defaultValues: {
             highSchoolName: '',
             street: '',

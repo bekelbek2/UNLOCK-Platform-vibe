@@ -127,7 +127,8 @@ export default function TestScoresTab() {
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const form = useForm<TestScoreFormData>({
-        resolver: zodResolver(testScoreSchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(testScoreSchema) as any,
         defaultValues: {
             testType: '',
             month: '',

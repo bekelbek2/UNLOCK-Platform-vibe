@@ -37,7 +37,8 @@ import {
 
 export default function FamilyTab() {
     const form = useForm<FamilyFormData>({
-        resolver: zodResolver(familyFormSchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(familyFormSchema) as any,
         defaultValues: {
             maritalStatus: '',
             permanentResidence: '',

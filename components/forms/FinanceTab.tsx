@@ -22,8 +22,7 @@ import { Input } from '@/components/ui/input';
 // Schema
 const financeSchema = z.object({
     expectedFamilyContribution: z.number({
-        required_error: 'Expected family contribution is required',
-        invalid_type_error: 'Please enter a valid number',
+        message: 'Expected family contribution is required',
     }).min(0, 'Amount must be a positive number'),
 });
 
@@ -50,7 +49,8 @@ export default function FinanceTab() {
     const [displayValue, setDisplayValue] = useState('');
 
     const form = useForm<FinanceFormData>({
-        resolver: zodResolver(financeSchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(financeSchema) as any,
         defaultValues: {
             expectedFamilyContribution: undefined,
         },

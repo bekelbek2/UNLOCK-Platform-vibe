@@ -5,7 +5,7 @@ export const personalFormSchema = z.object({
     firstName: z.string().min(1, 'First name is required'),
     lastName: z.string().min(1, 'Last name is required'),
     dateOfBirth: z.date({
-        required_error: 'Date of birth is required',
+        message: 'Date of birth is required',
     }),
 
     // Address

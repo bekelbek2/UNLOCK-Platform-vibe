@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Profile', href: '/profile', icon: User },
   { name: 'Activities & Honors', href: '/dashboard/activities-honors', icon: Award },
   { name: 'Applications', href: '/applications', icon: Building2 },
@@ -39,7 +39,9 @@ export default function Sidebar() {
       <nav className="flex-1 px-4 py-4">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const isActive = item.href === '/'
+              ? pathname === '/'
+              : pathname === item.href || pathname.startsWith(item.href + '/');
             const Icon = item.icon;
 
             return (

@@ -42,7 +42,8 @@ import {
 
 export default function PersonalTab() {
     const form = useForm<PersonalFormData>({
-        resolver: zodResolver(personalFormSchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(personalFormSchema) as any,
         defaultValues: {
             firstName: '',
             lastName: '',

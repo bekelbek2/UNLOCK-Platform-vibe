@@ -100,7 +100,7 @@ const activitySchema = z.object({
     timing: z.array(z.string()).min(1, 'Select at least one timing option'),
     hoursPerWeek: z.coerce.number().min(1, 'Required').max(168, 'Max 168 hours'),
     weeksPerYear: z.coerce.number().min(1, 'Required').max(52, 'Max 52 weeks'),
-    futureIntent: z.enum(['yes', 'no'], { required_error: 'Select an option' }),
+    futureIntent: z.enum(['yes', 'no'], { message: 'Select an option' }),
 });
 
 type ActivityFormData = z.infer<typeof activitySchema>;
@@ -228,7 +228,8 @@ export default function ActivitiesTab() {
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const form = useForm<ActivityFormData>({
-        resolver: zodResolver(activitySchema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resolver: zodResolver(activitySchema) as any,
         defaultValues: {
             activityType: '',
             position: '',
