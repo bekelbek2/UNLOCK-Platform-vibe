@@ -20,7 +20,7 @@ const navItems = [
   { name: 'Activities & Honors', href: '/dashboard/activities-honors', icon: Award },
   { name: 'Applications', href: '/applications', icon: Building2 },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Documents', href: '/documents', icon: FileText },
+  { name: 'Documents', href: '/dashboard/documents', icon: FileText },
   { name: 'Sessions', href: '/sessions', icon: Video },
   { name: 'Resource Center', href: '/resources', icon: BarChart3 },
 ];
