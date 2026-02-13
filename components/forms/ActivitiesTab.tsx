@@ -222,7 +222,11 @@ function SortableActivityCard({
     );
 }
 
+import { useProfileData } from '@/lib/profileStore';
+import { useEffect } from 'react';
+
 export default function ActivitiesTab() {
+    const { data: profileData, setActivities: updateStoreActivities } = useProfileData();
     const [activities, setActivities] = useState<Activity[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -249,25 +253,40 @@ export default function ActivitiesTab() {
 
     const isAtLimit = activities.length >= MAX_ACTIVITIES;
 
+    // Sync from store on load
+    useEffect(() => {
+        if (profileData.activities) {
+            // @ts-ignore
+            setActivities(profileData.activities);
+        }
+    }, [profileData.activities]);
+
+    const updateActivities = (newActivities: Activity[]) => {
+        setActivities(newActivities);
+        // @ts-ignore
+        updateStoreActivities(newActivities);
+    };
+
     const onSubmit = (data: ActivityFormData) => {
+        let newActivities: Activity[];
         if (editingId) {
-            setActivities((prev) =>
-                prev.map((a) => (a.id === editingId ? { ...data, id: editingId } : a))
-            );
+            newActivities = activities.map((a) => (a.id === editingId ? { ...data, id: editingId } : a));
         } else {
             const newActivity: Activity = {
                 ...data,
                 id: crypto.randomUUID(),
             };
-            setActivities((prev) => [...prev, newActivity]);
+            newActivities = [...activities, newActivity];
         }
+        updateActivities(newActivities);
         form.reset();
         setEditingId(null);
         setDialogOpen(false);
     };
 
     const deleteActivity = (id: string) => {
-        setActivities((prev) => prev.filter((a) => a.id !== id));
+        const newActivities = activities.filter((a) => a.id !== id);
+        updateActivities(newActivities);
     };
 
     // ─── Drag & Drop ─────────────────────────────────────────────────────────
@@ -279,11 +298,10 @@ export default function ActivitiesTab() {
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
-            setActivities((prev) => {
-                const oldIndex = prev.findIndex((a) => a.id === active.id);
-                const newIndex = prev.findIndex((a) => a.id === over.id);
-                return arrayMove(prev, oldIndex, newIndex);
-            });
+            const oldIndex = activities.findIndex((a) => a.id === active.id);
+            const newIndex = activities.findIndex((a) => a.id === over.id);
+            const newActivities = arrayMove(activities, oldIndex, newIndex);
+            updateActivities(newActivities);
         }
     };
 

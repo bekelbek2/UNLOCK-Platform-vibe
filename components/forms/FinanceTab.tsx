@@ -45,7 +45,11 @@ function parseFormattedNumber(value: string): number {
     return numericValue ? parseInt(numericValue, 10) : 0;
 }
 
+import { useProfileData } from '@/lib/profileStore';
+import { useEffect } from 'react';
+
 export default function FinanceTab() {
+    const { data: profileData, updateFinance } = useProfileData();
     const [displayValue, setDisplayValue] = useState('');
 
     const form = useForm<FinanceFormData>({
@@ -55,6 +59,14 @@ export default function FinanceTab() {
             expectedFamilyContribution: undefined,
         },
     });
+
+    useEffect(() => {
+        const val = profileData.finance?.expectedFamilyContribution;
+        if (typeof val === 'number') {
+            form.setValue('expectedFamilyContribution', val);
+            setDisplayValue(val.toLocaleString('en-US'));
+        }
+    }, [profileData.finance, form]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawValue = e.target.value;
@@ -68,7 +80,10 @@ export default function FinanceTab() {
 
     const onSubmit = (data: FinanceFormData) => {
         console.log('Finance data:', data);
-        toast.success('Financial details saved');
+        updateFinance(data);
+        toast.success('Financial details saved', {
+            description: 'Your financial information has been updated successfully.',
+        });
     };
 
     return (

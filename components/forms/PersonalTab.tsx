@@ -39,33 +39,65 @@ import {
     GENDERS,
     ETHNICITIES,
 } from '@/lib/schemas/personal-form';
+import { useProfileData } from '@/lib/profileStore';
+import { useEffect } from 'react';
 
 export default function PersonalTab() {
+    const { data, updatePersonal } = useProfileData();
+
     const form = useForm<PersonalFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(personalFormSchema) as any,
         defaultValues: {
-            firstName: '',
-            lastName: '',
-            dateOfBirth: undefined,
-            streetName: '',
-            city: '',
-            stateProvince: '',
-            country: '',
-            zipCode: '',
-            phoneNumber: '+1',
-            gender: '',
-            ethnicity: '',
-            countryOfBirth: '',
-            countriesOfCitizenship: [],
+            firstName: (data.personal.firstName as string) || '',
+            lastName: (data.personal.lastName as string) || '',
+            dateOfBirth: data.personal.dateOfBirth ? new Date(data.personal.dateOfBirth as string) : undefined,
+            streetName: (data.personal.streetName as string) || '',
+            city: (data.personal.city as string) || '',
+            stateProvince: (data.personal.stateProvince as string) || '',
+            country: (data.personal.country as string) || '',
+            zipCode: (data.personal.zipCode as string) || '',
+            phoneNumber: (data.personal.phoneNumber as string) || '+1',
+            gender: (data.personal.gender as string) || '',
+            ethnicity: (data.personal.ethnicity as string) || '',
+            countryOfBirth: (data.personal.countryOfBirth as string) || '',
+            countriesOfCitizenship: (data.personal.countriesOfCitizenship as string[]) || [],
         },
     });
 
-    const onSubmit = async (data: PersonalFormData) => {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+    useEffect(() => {
+        if (data.personal) {
+            form.reset({
+                firstName: (data.personal.firstName as string) || '',
+                lastName: (data.personal.lastName as string) || '',
+                dateOfBirth: data.personal.dateOfBirth ? new Date(data.personal.dateOfBirth as string) : undefined,
+                streetName: (data.personal.streetName as string) || '',
+                city: (data.personal.city as string) || '',
+                stateProvince: (data.personal.stateProvince as string) || '',
+                country: (data.personal.country as string) || '',
+                zipCode: (data.personal.zipCode as string) || '',
+                phoneNumber: (data.personal.phoneNumber as string) || '+1',
+                gender: (data.personal.gender as string) || '',
+                ethnicity: (data.personal.ethnicity as string) || '',
+                countryOfBirth: (data.personal.countryOfBirth as string) || '',
+                countriesOfCitizenship: (data.personal.countriesOfCitizenship as string[]) || [],
+            });
+        }
+    }, [data.personal, form]);
 
-        console.log('Form submitted:', data);
+    const onSubmit = async (formData: PersonalFormData) => {
+        // Simulate API call
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Save to store (which saves to localStorage)
+        updatePersonal({
+            ...formData,
+            // Convert date to string for storage if needed, or keep as is if store supports it.
+            // JSON.stringify will handle Date objects as ISO strings automatically.
+            dateOfBirth: formData.dateOfBirth ? formData.dateOfBirth.toISOString() : undefined,
+        });
+
+        console.log('Form submitted:', formData);
         toast.success('Personal details saved.', {
             description: 'Your personal information has been updated successfully.',
         });

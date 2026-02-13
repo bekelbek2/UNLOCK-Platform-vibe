@@ -24,6 +24,18 @@ export interface Activity {
     futureIntent: string;
 }
 
+export interface Essay {
+    id: string;
+    title: string;
+    linkedDocumentId: string;
+}
+
+export interface Recommendation {
+    id: string;
+    title: string;
+    linkedDocumentId: string;
+}
+
 export interface StudentData {
     personal: Record<string, unknown>;
     family: Record<string, unknown>;
@@ -32,6 +44,8 @@ export interface StudentData {
     activities: Activity[];
     honors: Honor[];
     finance: Record<string, unknown>;
+    essays: Essay[];
+    recommendations: Recommendation[];
 }
 
 interface ProfileDataContextType {
@@ -51,6 +65,13 @@ interface ProfileDataContextType {
     removeHonor: (id: string) => void;
     updateHonor: (id: string, updates: Partial<Honor>) => void;
     updateFinance: (finance: Record<string, unknown>) => void;
+    // Essay CRUD
+    addEssay: (title: string, linkedDocumentId: string) => void;
+    removeEssay: (id: string) => void;
+    updateEssay: (id: string, updates: Partial<Essay>) => void;
+    // Recommendation CRUD
+    addRecommendation: (title: string, linkedDocumentId: string) => void;
+    removeRecommendation: (id: string) => void;
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -65,6 +86,8 @@ const defaultData: StudentData = {
     activities: [],
     honors: [],
     finance: {},
+    essays: [],
+    recommendations: [],
 };
 
 function loadFromStorage(): StudentData {
@@ -73,7 +96,27 @@ function loadFromStorage(): StudentData {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return defaultData;
         const parsed = JSON.parse(raw);
-        return { ...defaultData, ...parsed };
+
+        const migratedData: StudentData = { ...defaultData, ...parsed };
+
+        // Migration: Check for legacy single essay
+        // @ts-ignore - 'essay' property might exist in old data
+        if (parsed.essay?.personalStatementId && (!parsed.essays || parsed.essays.length === 0)) {
+            migratedData.essays = [{
+                id: 'legacy-personal-statement',
+                title: 'Personal Statement',
+                // @ts-ignore
+                linkedDocumentId: parsed.essay.personalStatementId
+            }];
+        }
+
+        // Ensure arrays exist
+        if (!migratedData.essays) migratedData.essays = [];
+        if (!migratedData.recommendations) migratedData.recommendations = [];
+        if (!migratedData.activities) migratedData.activities = [];
+        if (!migratedData.honors) migratedData.honors = [];
+
+        return migratedData;
     } catch {
         return defaultData;
     }
@@ -165,6 +208,55 @@ export function ProfileDataProvider({ children }: { children: ReactNode }) {
         setData((prev) => ({ ...prev, finance }));
     }, []);
 
+    // ─── Essay CRUD ──────────────────────────────────────────────────────────
+
+    const addEssay = useCallback((title: string, linkedDocumentId: string) => {
+        const newEssay: Essay = {
+            id: Date.now().toString(),
+            title,
+            linkedDocumentId
+        };
+        setData((prev) => ({
+            ...prev,
+            essays: [...(prev.essays || []), newEssay]
+        }));
+    }, []);
+
+    const removeEssay = useCallback((id: string) => {
+        setData((prev) => ({
+            ...prev,
+            essays: prev.essays.filter(e => e.id !== id)
+        }));
+    }, []);
+
+    const updateEssay = useCallback((id: string, updates: Partial<Essay>) => {
+        setData((prev) => ({
+            ...prev,
+            essays: prev.essays.map(e => e.id === id ? { ...e, ...updates } : e)
+        }));
+    }, []);
+
+    // ─── Recommendation CRUD ────────────────────────────────────────────────
+
+    const addRecommendation = useCallback((title: string, linkedDocumentId: string) => {
+        const newRec: Recommendation = {
+            id: Date.now().toString(),
+            title,
+            linkedDocumentId
+        };
+        setData((prev) => ({
+            ...prev,
+            recommendations: [...(prev.recommendations || []), newRec]
+        }));
+    }, []);
+
+    const removeRecommendation = useCallback((id: string) => {
+        setData((prev) => ({
+            ...prev,
+            recommendations: prev.recommendations.filter(r => r.id !== id)
+        }));
+    }, []);
+
     return (
         <ProfileDataContext.Provider
             value={{
@@ -182,6 +274,11 @@ export function ProfileDataProvider({ children }: { children: ReactNode }) {
                 removeHonor,
                 updateHonor,
                 updateFinance,
+                addEssay,
+                removeEssay,
+                updateEssay,
+                addRecommendation,
+                removeRecommendation,
             }}
         >
             {children}

@@ -4,11 +4,20 @@ import { useState, useEffect, useCallback } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export interface Reply {
+    id: string;
+    text: string;
+    author: string;
+    date: string;
+}
+
 export interface DocComment {
     id: string;
     text: string;
     quote: string;
     date: string;
+    author?: string;
+    replies?: Reply[];
 }
 
 export interface Document {
@@ -115,7 +124,9 @@ export function useDocumentStore() {
             id: comment.id || Date.now().toString(),
             text: comment.text,
             quote: comment.quote,
-            date: comment.date
+            date: comment.date,
+            author: comment.author || 'You',
+            replies: comment.replies || [],
         };
         setStore((prev) => ({
             ...prev,
@@ -124,6 +135,43 @@ export function useDocumentStore() {
                     ? { ...doc, comments: [...doc.comments, newComment] }
                     : doc
             ),
+        }));
+    }, []);
+
+    const addReply = useCallback((docId: string, commentId: string, text: string) => {
+        const newReply: Reply = {
+            id: crypto.randomUUID(),
+            text,
+            author: 'You',
+            date: new Date().toISOString(),
+        };
+
+        setStore((prev) => ({
+            ...prev,
+            documents: prev.documents.map((doc) => {
+                if (doc.id !== docId) return doc;
+                return {
+                    ...doc,
+                    comments: doc.comments.map((c) =>
+                        c.id === commentId
+                            ? { ...c, replies: [...(c.replies || []), newReply] }
+                            : c
+                    ),
+                };
+            }),
+        }));
+    }, []);
+
+    const deleteComment = useCallback((docId: string, commentId: string) => {
+        setStore((prev) => ({
+            ...prev,
+            documents: prev.documents.map((doc) => {
+                if (doc.id !== docId) return doc;
+                return {
+                    ...doc,
+                    comments: doc.comments.filter((c) => c.id !== commentId),
+                };
+            }),
         }));
     }, []);
 
@@ -158,6 +206,8 @@ export function useDocumentStore() {
         renameDocument,
         deleteDocument,
         addComment,
+        addReply,
+        deleteComment,
         getDocument,
         syncComments,
     };

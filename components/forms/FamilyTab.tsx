@@ -34,17 +34,21 @@ import {
     RELATIONSHIP_OPTIONS,
     EDUCATION_LEVELS,
 } from '@/lib/schemas/family-form';
+import { useProfileData } from '@/lib/profileStore';
+
 
 export default function FamilyTab() {
+    const { data, updateFamily } = useProfileData();
+
     const form = useForm<FamilyFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(familyFormSchema) as any,
         defaultValues: {
-            maritalStatus: '',
-            permanentResidence: '',
-            hasChildren: '',
-            numberOfChildren: undefined,
-            parent1: {
+            maritalStatus: (data.family.maritalStatus as string) || '',
+            permanentResidence: (data.family.permanentResidence as string) || '',
+            hasChildren: (data.family.hasChildren as string) || '',
+            numberOfChildren: (data.family.numberOfChildren as number) || undefined,
+            parent1: (data.family.parent1 as any) || {
                 relationship: '',
                 isLiving: '',
                 firstName: '',
@@ -53,7 +57,7 @@ export default function FamilyTab() {
                 occupation: '',
                 educationLevel: '',
             },
-            parent2: {
+            parent2: (data.family.parent2 as any) || {
                 relationship: '',
                 isLiving: '',
                 firstName: '',
@@ -62,8 +66,8 @@ export default function FamilyTab() {
                 occupation: '',
                 educationLevel: '',
             },
-            numberOfSiblings: 0,
-            siblings: [],
+            numberOfSiblings: (data.family.numberOfSiblings as number) || 0,
+            siblings: (data.family.siblings as any[]) || [],
         },
     });
 
@@ -89,9 +93,44 @@ export default function FamilyTab() {
         }
     }, [watchNumberOfSiblings, replace, form]);
 
-    const onSubmit = async (data: FamilyFormData) => {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        console.log('Family form submitted:', data);
+    useEffect(() => {
+        if (data.family && Object.keys(data.family).length > 0) {
+            form.reset({
+                maritalStatus: (data.family.maritalStatus as string) || '',
+                permanentResidence: (data.family.permanentResidence as string) || '',
+                hasChildren: (data.family.hasChildren as string) || '',
+                numberOfChildren: (data.family.numberOfChildren as number) || undefined,
+                parent1: (data.family.parent1 as any) || {
+                    relationship: '',
+                    isLiving: '',
+                    firstName: '',
+                    lastName: '',
+                    phoneNumber: '+1',
+                    occupation: '',
+                    educationLevel: '',
+                },
+                parent2: (data.family.parent2 as any) || {
+                    relationship: '',
+                    isLiving: '',
+                    firstName: '',
+                    lastName: '',
+                    phoneNumber: '+1',
+                    occupation: '',
+                    educationLevel: '',
+                },
+                numberOfSiblings: (data.family.numberOfSiblings as number) || 0,
+                siblings: (data.family.siblings as any[]) || [],
+            });
+        }
+    }, [data.family, form]);
+
+
+    const onSubmit = async (formData: FamilyFormData) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        updateFamily(formData);
+
+        console.log('Family form submitted:', formData);
         toast.success('Family details saved.', {
             description: 'Your family information has been updated successfully.',
         });
@@ -348,7 +387,10 @@ export default function FamilyTab() {
                                                 placeholder="Enter number"
                                                 className="focus-visible:ring-[#C26E26] w-32"
                                                 {...field}
-                                                onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                                onChange={(e) => {
+                                                    const val = e.target.valueAsNumber;
+                                                    field.onChange(isNaN(val) ? undefined : val);
+                                                }}
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -448,7 +490,10 @@ export default function FamilyTab() {
                                                             placeholder="Enter age"
                                                             className="focus-visible:ring-[#C26E26] w-24"
                                                             {...field}
-                                                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.valueAsNumber;
+                                                                field.onChange(isNaN(val) ? undefined : val);
+                                                            }}
                                                         />
                                                     </FormControl>
                                                     <FormMessage />

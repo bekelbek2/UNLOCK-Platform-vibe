@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -121,7 +121,10 @@ interface TestScore extends TestScoreFormData {
     displayScore: string;
 }
 
+import { useProfileData } from '@/lib/profileStore';
+
 export default function TestScoresTab() {
+    const { data: profileData, setTestScores: updateStoreTestScores } = useProfileData();
     const [testScores, setTestScores] = useState<TestScore[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -153,6 +156,14 @@ export default function TestScoresTab() {
     });
 
     const testType = form.watch('testType');
+
+    // Sync from store on load
+    useEffect(() => {
+        if (profileData.testScores) {
+            // @ts-ignore
+            setTestScores(profileData.testScores as TestScore[]);
+        }
+    }, [profileData.testScores]);
 
     const calculateDisplayScore = (data: TestScoreFormData): string => {
         switch (data.testType) {
@@ -201,14 +212,14 @@ export default function TestScoresTab() {
     };
 
     const onSubmit = (data: TestScoreFormData) => {
+        let newScores: TestScore[];
+
         if (editingId) {
             // Update existing
-            setTestScores((prev) =>
-                prev.map((t) =>
-                    t.id === editingId
-                        ? { ...data, id: editingId, displayScore: calculateDisplayScore(data) }
-                        : t
-                )
+            newScores = testScores.map((t) =>
+                t.id === editingId
+                    ? { ...data, id: editingId, displayScore: calculateDisplayScore(data) }
+                    : t
             );
         } else {
             // Create new
@@ -217,8 +228,13 @@ export default function TestScoresTab() {
                 id: crypto.randomUUID(),
                 displayScore: calculateDisplayScore(data),
             };
-            setTestScores((prev) => [...prev, newScore]);
+            newScores = [...testScores, newScore];
         }
+
+        setTestScores(newScores);
+        // @ts-ignore
+        updateStoreTestScores(newScores);
+
         form.reset();
         setEditingId(null);
         setDialogOpen(false);
@@ -259,7 +275,10 @@ export default function TestScoresTab() {
     };
 
     const deleteTest = (id: string) => {
-        setTestScores((prev) => prev.filter((t) => t.id !== id));
+        const newScores = testScores.filter((t) => t.id !== id);
+        setTestScores(newScores);
+        // @ts-ignore
+        updateStoreTestScores(newScores);
     };
 
     return (

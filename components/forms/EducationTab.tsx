@@ -45,38 +45,42 @@ const COUNTRIES = [
     'Australia', 'Japan', 'China', 'India', 'Brazil', 'South Korea', 'Nigeria', 'Kenya'
 ];
 
+import { useProfileData } from '@/lib/profileStore';
+
 export default function EducationTab() {
+    const { data, updateEducation } = useProfileData();
+
     const form = useForm<EducationFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(educationFormSchema) as any,
         defaultValues: {
-            highSchoolName: '',
-            street: '',
-            city: '',
-            stateProvince: '',
-            country: '',
-            zipCode: '',
-            schoolType: '',
-            entryMonth: '',
-            entryYear: '',
-            isBoardingSchool: '',
-            livesOnCampus: '',
-            willGraduate: '',
-            exitMonth: '',
-            exitYear: '',
-            graduationMonth: '',
-            graduationYear: '',
-            progressionChanges: [],
-            progressionDetails: '',
-            classSize: 0,
-            classRank: '',
-            gpaScale: '',
-            cumulativeGpa: 0,
-            gpaType: '',
-            studentStatus: '',
-            highestDegree: '',
-            careerInterest: '',
-            otherCareer: '',
+            highSchoolName: (data.education.highSchoolName as string) || '',
+            street: (data.education.street as string) || '',
+            city: (data.education.city as string) || '',
+            stateProvince: (data.education.stateProvince as string) || '',
+            country: (data.education.country as string) || '',
+            zipCode: (data.education.zipCode as string) || '',
+            schoolType: (data.education.schoolType as string) || '',
+            entryMonth: (data.education.entryMonth as string) || '',
+            entryYear: (data.education.entryYear as string) || '',
+            isBoardingSchool: (data.education.isBoardingSchool as string) || '',
+            livesOnCampus: (data.education.livesOnCampus as string) || '',
+            willGraduate: (data.education.willGraduate as string) || '',
+            exitMonth: (data.education.exitMonth as string) || '',
+            exitYear: (data.education.exitYear as string) || '',
+            graduationMonth: (data.education.graduationMonth as string) || '',
+            graduationYear: (data.education.graduationYear as string) || '',
+            progressionChanges: (data.education.progressionChanges as string[]) || [],
+            progressionDetails: (data.education.progressionDetails as string) || '',
+            classSize: (data.education.classSize as number) || 0,
+            classRank: (data.education.classRank as string) || '',
+            gpaScale: (data.education.gpaScale as string) || '',
+            cumulativeGpa: (data.education.cumulativeGpa as number) || 0,
+            gpaType: (data.education.gpaType as string) || '',
+            studentStatus: (data.education.studentStatus as string) || '',
+            highestDegree: (data.education.highestDegree as string) || '',
+            careerInterest: (data.education.careerInterest as string) || '',
+            otherCareer: (data.education.otherCareer as string) || '',
         },
     });
 
@@ -104,13 +108,48 @@ export default function EducationTab() {
         }
     };
 
-
+    useEffect(() => {
+        if (data.education) {
+            form.reset({
+                highSchoolName: (data.education.highSchoolName as string) || '',
+                street: (data.education.street as string) || '',
+                city: (data.education.city as string) || '',
+                stateProvince: (data.education.stateProvince as string) || '',
+                country: (data.education.country as string) || '',
+                zipCode: (data.education.zipCode as string) || '',
+                schoolType: (data.education.schoolType as string) || '',
+                entryMonth: (data.education.entryMonth as string) || '',
+                entryYear: (data.education.entryYear as string) || '',
+                isBoardingSchool: (data.education.isBoardingSchool as string) || '',
+                livesOnCampus: (data.education.livesOnCampus as string) || '',
+                willGraduate: (data.education.willGraduate as string) || '',
+                exitMonth: (data.education.exitMonth as string) || '',
+                exitYear: (data.education.exitYear as string) || '',
+                graduationMonth: (data.education.graduationMonth as string) || '',
+                graduationYear: (data.education.graduationYear as string) || '',
+                progressionChanges: (data.education.progressionChanges as string[]) || [],
+                progressionDetails: (data.education.progressionDetails as string) || '',
+                classSize: (data.education.classSize as number) || 0,
+                classRank: (data.education.classRank as string) || '',
+                gpaScale: (data.education.gpaScale as string) || '',
+                cumulativeGpa: (data.education.cumulativeGpa as number) || 0,
+                gpaType: (data.education.gpaType as string) || '',
+                studentStatus: (data.education.studentStatus as string) || '',
+                highestDegree: (data.education.highestDegree as string) || '',
+                careerInterest: (data.education.careerInterest as string) || '',
+                otherCareer: (data.education.otherCareer as string) || '',
+            });
+        }
+    }, [data.education, form]);
 
     const showProgressionDetails = watchProgressionChanges.some(c => c !== 'No Change' && c !== '');
 
-    const onSubmit = async (data: EducationFormData) => {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        console.log('Education form submitted:', data);
+    const onSubmit = async (formData: EducationFormData) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        updateEducation(formData);
+
+        console.log('Education form submitted:', formData);
         toast.success('Education details saved.', {
             description: 'Your education information has been updated successfully.',
         });

@@ -25,6 +25,7 @@ import {
     Check,
     FileText,
 } from 'lucide-react';
+import { CommentItem } from '@/components/CommentItem';
 // import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 // Simple Avatar Component
@@ -126,6 +127,9 @@ function CommentsSidebar({
     onCancelComment,
     activeCommentId,
     setActiveCommentId,
+    docId,
+    onDeleteComment,
+    onReplyComment,
 }: {
     comments: DocComment[];
     isAddingComment: boolean;
@@ -135,6 +139,9 @@ function CommentsSidebar({
     onCancelComment: () => void;
     activeCommentId: string | null;
     setActiveCommentId: (id: string | null) => void;
+    docId: string;
+    onDeleteComment: (commentId: string) => void;
+    onReplyComment: (commentId: string, text: string) => void;
 }) {
     return (
         <div className="w-80 border-l border-gray-200 bg-white h-full overflow-y-auto flex flex-col">
@@ -184,33 +191,17 @@ function CommentsSidebar({
                         <p className="text-xs mt-1">Select text to add a comment</p>
                     </div>
                 ) : (
+
                     comments.map((comment) => (
-                        <div
+                        <CommentItem
                             key={comment.id}
+                            comment={comment}
+                            docId={docId}
+                            isActive={activeCommentId === comment.id}
                             onClick={() => setActiveCommentId(comment.id)}
-                            className={`rounded-lg border shadow-sm p-3 hover:shadow-md transition-all cursor-pointer ${activeCommentId === comment.id
-                                ? 'bg-orange-50 ring-2 ring-[#D97706] border-transparent'
-                                : 'bg-white border-gray-200'
-                                }`}
-                        >
-                            <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <CommentAvatar initial="U" />
-                                    <span className="text-sm font-medium text-gray-900">User</span>
-                                    <span className="text-xs text-gray-400">
-                                        {new Date(comment.date).toLocaleDateString()}
-                                    </span>
-                                </div>
-                            </div>
-                            {comment.quote && (
-                                <div className="pl-2 border-l-2 border-yellow-300 mb-2">
-                                    <p className="text-xs text-gray-500 italic line-clamp-2">
-                                        "{comment.quote}"
-                                    </p>
-                                </div>
-                            )}
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.text}</p>
-                        </div>
+                            onDelete={onDeleteComment}
+                            onReply={onReplyComment}
+                        />
                     ))
                 )}
             </div>
@@ -223,7 +214,7 @@ function CommentsSidebar({
 export default function DocumentEditor({ params }: EditorProps) {
     const { id } = use(params);
     const router = useRouter();
-    const { getDocument, updateDocument, renameDocument, addComment, syncComments, hydrated } = useDocumentStore();
+    const { getDocument, updateDocument, renameDocument, addComment, addReply, deleteComment, syncComments, hydrated } = useDocumentStore();
     const [doc, setDoc] = useState<ReturnType<typeof getDocument>>(undefined);
     const [title, setTitle] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -339,7 +330,7 @@ export default function DocumentEditor({ params }: EditorProps) {
             // Debounce save
             const timeoutId = setTimeout(() => {
                 updateDocument(doc.id, content as Record<string, unknown>);
-                syncComments(doc.id, Array.from(activeCommentIds));
+                // syncComments(doc.id, Array.from(activeCommentIds));
                 setIsSaving(false);
             }, 1000);
             return () => clearTimeout(timeoutId);
@@ -352,6 +343,32 @@ export default function DocumentEditor({ params }: EditorProps) {
             editor.commands.setContent(doc.content);
         }
     }, [doc?.content, editor]);
+
+    // Sync Store -> Editor (Remove Orphaned Marks / Zombie Highlights)
+    useEffect(() => {
+        if (!editor || !doc) return;
+
+        const currentComments = new Set(doc.comments.map(c => c.id));
+        const transaction = editor.state.tr;
+        let modified = false;
+
+        editor.state.doc.descendants((node, pos) => {
+            if (node.marks) {
+                node.marks.forEach(mark => {
+                    if (mark.type.name === 'highlight' && mark.attrs.commentId) {
+                        if (!currentComments.has(mark.attrs.commentId)) {
+                            transaction.removeMark(pos, pos + node.nodeSize, mark.type);
+                            modified = true;
+                        }
+                    }
+                });
+            }
+        });
+
+        if (modified) {
+            editor.view.dispatch(transaction);
+        }
+    }, [doc?.comments, editor]);
 
     // Handle Commenting Flow
     const handleAddCommentClick = () => {
@@ -566,6 +583,7 @@ export default function DocumentEditor({ params }: EditorProps) {
 
                 {/* Right Sidebar - Comments */}
                 <CommentsSidebar
+                    docId={doc.id}
                     comments={doc.comments}
                     isAddingComment={isAddingComment}
                     newCommentText={commentText}
@@ -574,6 +592,8 @@ export default function DocumentEditor({ params }: EditorProps) {
                     onCancelComment={handleCancelComment}
                     activeCommentId={activeCommentId}
                     setActiveCommentId={setActiveCommentId}
+                    onDeleteComment={(commentId) => deleteComment(doc.id, commentId)}
+                    onReplyComment={(commentId, text) => addReply(doc.id, commentId, text)}
                 />
             </div>
         </div>
