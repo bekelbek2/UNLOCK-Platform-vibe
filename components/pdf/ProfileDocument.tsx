@@ -356,7 +356,7 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                     <Text style={styles.sectionTitle}>Family</Text>
 
                     {/* Household Info */}
-                    {(family.maritalStatus || family.permanentResidence) && (
+                    {(getString(family.maritalStatus) || getString(family.permanentResidence)) && (
                         <View style={{ marginBottom: 12 }}>
                             <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#e75e24' }}>Household</Text>
                             <View style={styles.row}>
