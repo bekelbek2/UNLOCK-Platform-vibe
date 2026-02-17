@@ -12,6 +12,8 @@ import TestScoresTab from '@/components/forms/TestScoresTab';
 import FinanceTab from '@/components/forms/FinanceTab';
 import { EssaysTab } from '@/components/profile/EssaysTab';
 import { RecommendationsTab } from '@/components/profile/RecommendationsTab';
+import { ActivitiesSummaryTab } from '@/components/profile/ActivitiesSummaryTab';
+import { HonorsSummaryTab } from '@/components/profile/HonorsSummaryTab';
 import { useProfileData } from '@/lib/profileStore';
 import { Button } from '@/components/ui/button';
 import { ProfilePreviewModal } from '@/components/pdf/ProfilePreviewModal';
@@ -21,9 +23,11 @@ const profileTabs = [
     { id: 'family', label: 'Family' },
     { id: 'education', label: 'Education' },
     { id: 'test-scores', label: 'Test Scores' },
-    { id: 'finance', label: 'Finance' },
+    { id: 'activities', label: 'Activities' },
+    { id: 'honors', label: 'Honors' },
     { id: 'essays', label: 'Essays' },
     { id: 'recommendations', label: 'Recommendation Letters' },
+    { id: 'finance', label: 'Finance' },
 ];
 
 export default function ProfilePage() {
@@ -51,7 +55,7 @@ export default function ProfilePage() {
                     {isClient && (
                         <Button variant="outline" className="gap-2" onClick={() => setShowPreview(true)}>
                             <Eye className="h-4 w-4" />
-                            Preview Profile
+                            Review PDF
                         </Button>
                     )}
                 </div>
@@ -73,10 +77,15 @@ export default function ProfilePage() {
 
                     {activeTab === 'test-scores' && <TestScoresTab />}
 
-                    {activeTab === 'finance' && <FinanceTab />}
+                    {activeTab === 'activities' && <ActivitiesSummaryTab />}
+
+                    {activeTab === 'honors' && <HonorsSummaryTab />}
 
                     {activeTab === 'essays' && <EssaysTab />}
+
                     {activeTab === 'recommendations' && <RecommendationsTab />}
+
+                    {activeTab === 'finance' && <FinanceTab />}
                 </div>
             </div>
         </MainLayout>

@@ -57,7 +57,7 @@ export function ProfilePreviewModal({ isOpen, onClose, data }: ProfilePreviewMod
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="px-6 py-4 border-b flex flex-row items-center justify-between">
-                    <DialogTitle>Profile Preview</DialogTitle>
+                    <DialogTitle>Application PDF Proof</DialogTitle>
                     {/* Close button is handled by DialogPrimitive, but we adding title */}
                 </DialogHeader>
 
@@ -79,7 +79,7 @@ export function ProfilePreviewModal({ isOpen, onClose, data }: ProfilePreviewMod
                         {({ blob, url, loading, error }) => (
                             <Button variant="default" className="gap-2" disabled={loading}>
                                 <Download className="h-4 w-4" />
-                                {loading ? 'Generating...' : 'Download PDF'}
+                                {loading ? 'Generating...' : 'Download Official PDF'}
                             </Button>
                         )}
                     </PDFDownloadLink>

@@ -28,13 +28,13 @@ const styles = StyleSheet.create({
     header: {
         marginBottom: 20,
         borderBottomWidth: 3,
-        borderBottomColor: '#e75e24', // Brand Orange
+        borderBottomColor: '#C26E26', // Brand Burnt Orange
         paddingBottom: 10,
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#e75e24', // Brand Orange
+        color: '#C26E26', // Brand Burnt Orange
         marginBottom: 5,
     },
     headerSub: {
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         marginBottom: 8,
-        color: '#e75e24', // Brand Orange
+        color: '#C26E26', // Brand Burnt Orange
         borderBottomWidth: 1,
         borderBottomColor: '#cccccc',
         paddingBottom: 2,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     activityTitle: {
         fontWeight: 'bold',
         fontSize: 11,
-        color: '#e75e24',
+        color: '#C26E26', // Brand Burnt Orange
     },
     activityOrg: {
         fontStyle: 'italic',
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     bullet: {
         width: 10,
         fontSize: 10,
-        color: '#e75e24',
+        color: '#C26E26', // Brand Burnt Orange
     },
     documentContent: {
         marginTop: 4,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: 'bold',
         marginBottom: 4,
-        color: '#e75e24',
+        color: '#C26E26', // Brand Burnt Orange
         backgroundColor: '#F3F0E6', // Muted accent
         padding: 2,
     },
@@ -233,6 +233,7 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                         />
                         <View style={{ alignItems: 'flex-end' }}>
                             <Text style={{ fontSize: 10, color: '#000' }}>Unlock Application</Text>
+                            <Text style={{ fontSize: 10, color: '#666' }}>Unlock Profile ID: [########]</Text>
                             <Text style={{ fontSize: 10, color: '#000' }}>{currentDate}</Text>
                         </View>
                     </View>
@@ -350,7 +351,6 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                 )}
 
                 {/* Section 4: Family */}
-                {/* Section 4: Family */}
                 {/* Detailed family breakdown including Household, Parents, and Siblings */}
                 <View style={styles.section} wrap={false}>
                     <Text style={styles.sectionTitle}>Family</Text>
@@ -358,7 +358,7 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                     {/* Household Info */}
                     {(getString(family.maritalStatus) || getString(family.permanentResidence)) && (
                         <View style={{ marginBottom: 12 }}>
-                            <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#e75e24' }}>Household</Text>
+                            <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#C26E26' }}>Household</Text>
                             <View style={styles.row}>
                                 <Text style={styles.label}>Parents' Marital Status:</Text>
                                 <Text style={styles.value}>{getString(family.maritalStatus)}</Text>
@@ -383,7 +383,7 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
 
                         return (
                             <View key={num} style={{ marginBottom: 12 }} wrap={false}>
-                                <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#e75e24' }}>
+                                <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#C26E26' }}>
                                     Parent {num}
                                 </Text>
                                 <View style={styles.row}>
@@ -416,7 +416,7 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                     {/* Siblings */}
                     {Array.isArray(family.siblings) && family.siblings.length > 0 && (
                         <View wrap={false}>
-                            <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#e75e24' }}>Siblings</Text>
+                            <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 4, color: '#C26E26' }}>Siblings</Text>
                             <View style={styles.row}>
                                 <Text style={styles.label}>Total Siblings:</Text>
                                 <Text style={styles.value}>{getNumber(family.numberOfSiblings)}</Text>
@@ -459,7 +459,7 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                             <View key={index} style={styles.activityItem} wrap={false}>
                                 <View style={styles.activityHeader}>
                                     <Text style={styles.activityTitle}>
-                                        {activity.position || 'Member'}, {activity.organizationName}
+                                        {activity.position || 'Member'} | {activity.organizationName}
                                     </Text>
                                     <Text style={{ fontSize: 9 }}>
                                         {activity.gradeLevels.join(', ')}
