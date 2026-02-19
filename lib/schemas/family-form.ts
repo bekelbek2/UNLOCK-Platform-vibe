@@ -2,13 +2,16 @@ import { z } from 'zod';
 
 // Parent schema
 const parentSchema = z.object({
+    id: z.string().optional(), // For key management
     relationship: z.string().min(1, 'Relationship is required'),
-    isLiving: z.string().min(1, 'Please specify if parent is living'),
+    age: z.coerce.number().min(1, 'Age must be positive').max(120, 'Invalid age'),
     firstName: z.string().min(1, 'First name is required'),
     lastName: z.string().min(1, 'Last name is required'),
-    phoneNumber: z.string().min(1, 'Phone number is required'),
-    occupation: z.string().min(1, 'Occupation is required'),
+    email: z.string().email('Invalid email address').optional().or(z.literal('')),
+    isLiving: z.enum(['yes', 'no'] as const),
     educationLevel: z.string().min(1, 'Education level is required'),
+    occupation: z.string().min(1, 'Occupation is required'),
+    employer: z.string().optional(),
 });
 
 // Sibling schema
@@ -17,7 +20,7 @@ const siblingSchema = z.object({
     age: z.coerce.number().min(0, 'Age is required').max(100, 'Invalid age'),
 });
 
-// Base schema without refine for use with useForm
+// Base schema
 export const familyFormSchema = z.object({
     // Section 1: Household Information
     maritalStatus: z.string().min(1, 'Marital status is required'),
@@ -25,9 +28,8 @@ export const familyFormSchema = z.object({
     hasChildren: z.string().optional(),
     numberOfChildren: z.coerce.number().min(1).optional(),
 
-    // Section 2: Parent/Guardian Information
-    parent1: parentSchema,
-    parent2: parentSchema,
+    // Section 2: Parents
+    parents: z.array(parentSchema).max(4, 'Maximum 4 parents allowed'),
 
     // Section 3: Siblings
     numberOfSiblings: z.coerce.number().min(0).max(10),
@@ -53,7 +55,14 @@ export const RESIDENCE_OPTIONS = [
     'Independent',
 ];
 
-export const RELATIONSHIP_OPTIONS = ['Mother', 'Father'];
+export const RELATIONSHIP_OPTIONS = [
+    'Father',
+    'Mother',
+    'Step-Father',
+    'Step-Mother',
+    'Legal Guardian',
+    'Other',
+];
 
 export const EDUCATION_LEVELS = [
     'No Schooling',
@@ -63,3 +72,6 @@ export const EDUCATION_LEVELS = [
     'Master\'s',
     'Doctorate/Professional',
 ];
+
+
+

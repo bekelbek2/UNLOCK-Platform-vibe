@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Award, Pencil, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Award, Eye, EyeOff, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     DndContext,
@@ -24,16 +24,18 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogDescription,
+    DialogFooter,
+    DialogTrigger,
 } from '@/components/ui/dialog';
 import {
     Form,
@@ -42,21 +44,41 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
+    FormDescription
 } from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { useProfileData, type Honor } from '@/lib/profileStore';
-import { GRADE_LEVELS, RECOGNITION_LEVELS } from '@/lib/schemas/education-form';
+// import { GRADE_LEVELS, RECOGNITION_LEVELS } from '@/lib/schemas/education-form'; // Removed, now local
 
-// ─── Schema ──────────────────────────────────────────────────────────────────
+// Constants
+const GRADE_LEVELS = ['9', '10', '11', '12', 'Post-Graduate'] as const;
+const RECOGNITION_LEVELS = ['School', 'State/Regional', 'National', 'International'] as const;
 
+const MAX_HONORS = 10;
+
+// Schema
 const honorFormSchema = z.object({
     title: z.string().min(1, 'Title is required').max(100, 'Max 100 characters'),
     gradeLevels: z.array(z.string()).min(1, 'Select at least one grade level'),
     recognitionLevels: z.array(z.string()).min(1, 'Select at least one recognition level'),
+    status: z.enum(['draft', 'ready']),
+    appearOnProfile: z.boolean().default(false),
 });
 
 type HonorFormData = z.infer<typeof honorFormSchema>;
 
-const MAX_HONORS = 5;
+// Character counter component
+function CharacterCounter({ current, max }: { current: number; max: number }) {
+    const isNearLimit = current >= max * 0.9;
+    const isAtLimit = current >= max;
+
+    return (
+        <span className={`text-xs ${isAtLimit ? 'text-red-500' : isNearLimit ? 'text-orange-500' : 'text-muted-foreground'}`}>
+            {current}/{max}
+        </span>
+    );
+}
 
 // ─── Sortable Honor Card ─────────────────────────────────────────────────────
 function SortableHonorCard({
@@ -85,86 +107,96 @@ function SortableHonorCard({
     };
 
     return (
-        <div
+        <Card
             ref={setNodeRef}
             style={style}
-            className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer group"
+            className="hover:shadow-md transition-shadow cursor-pointer group flex flex-col gap-1"
             onClick={() => onEdit(honor)}
         >
-            <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                    {/* Drag Handle */}
-                    <button
-                        type="button"
-                        className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
-                        onClick={(e) => e.stopPropagation()}
-                        {...attributes}
-                        {...listeners}
-                    >
-                        <GripVertical className="w-5 h-5" />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-amber-50 rounded-lg">
-                                <Award className="w-5 h-5 text-[#C26E26]" />
-                            </div>
-                            <h4 className="font-semibold text-gray-900 truncate">
-                                {honor.title}
-                            </h4>
+            <CardHeader className="py-3 px-4 pb-0">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Drag Handle */}
+                        <button
+                            type="button"
+                            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+                            onClick={(e) => e.stopPropagation()}
+                            {...attributes}
+                            {...listeners}
+                        >
+                            <GripVertical className="w-5 h-5" />
+                        </button>
+
+                        <div className="p-2 bg-amber-50 rounded-lg hidden sm:block">
+                            <Award className="w-5 h-5 text-[#C26E26]" />
                         </div>
-                        <div className="flex flex-wrap gap-2 ml-12">
-                            {honor.gradeLevels.map((g) => (
-                                <span
-                                    key={g}
-                                    className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full"
-                                >
-                                    Grade {g}
-                                </span>
-                            ))}
-                            {honor.recognitionLevels.map((r) => (
-                                <span
-                                    key={r}
-                                    className="px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded-full"
-                                >
-                                    {r}
-                                </span>
-                            ))}
+
+                        <h4 className="font-bold text-lg text-gray-900 line-clamp-1">{honor.title}</h4>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {/* Edit/Delete Actions - Visible on hover */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={(e) => { e.stopPropagation(); onEdit(honor); }}>
+                                <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); onDelete(honor.id); }}>
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
                         </div>
+
+                        {/* Status Badge */}
+                        {honor.status === 'ready' ? (
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 text-sm px-3 py-1">Ready</Badge>
+                        ) : (
+                            <Badge variant="outline" className="text-gray-500 border-gray-300 text-sm px-3 py-1">Draft</Badge>
+                        )}
+
+                        {/* Visibility Badge */}
+                        {honor.appearOnProfile ? (
+                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 gap-1 text-sm px-3 py-1">
+                                <Eye className="w-3 h-3" /> Visible
+                            </Badge>
+                        ) : (
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-500 hover:bg-gray-200 gap-1 text-sm px-3 py-1">
+                                <EyeOff className="w-3 h-3" /> Hidden
+                            </Badge>
+                        )}
                     </div>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(honor);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-[#C26E26] hover:bg-amber-50 rounded-lg transition"
-                    >
-                        <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(honor.id);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+            </CardHeader>
+            <CardContent className="py-3 px-4 pt-1 pb-4">
+                <div className="flex flex-col gap-2 ml-8 sm:ml-20">
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {honor.gradeLevels.map((g) => (
+                            <span
+                                key={g}
+                                className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-full border border-blue-100"
+                            >
+                                Grade {g}
+                            </span>
+                        ))}
+                        {honor.recognitionLevels.map((r) => (
+                            <span
+                                key={r}
+                                className="px-3 py-1.5 bg-green-50 text-green-700 text-sm font-medium rounded-full border border-green-100"
+                            >
+                                {r}
+                            </span>
+                        ))}
+                    </div>
                 </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function HonorsTab() {
-    const { data, setHonors } = useProfileData();
-    const honors = data.honors;
-
+    const { data: profileData, setHonors: updateStoreHonors } = useProfileData();
+    const [honors, setHonors] = useState<Honor[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingHonor, setEditingHonor] = useState<Honor | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const form = useForm<HonorFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -173,59 +205,47 @@ export default function HonorsTab() {
             title: '',
             gradeLevels: [],
             recognitionLevels: [],
+            status: 'draft',
+            appearOnProfile: false,
         },
     });
 
-    // ─── Handlers ────────────────────────────────────────────────────────────
+    const watchTitle = form.watch('title') || '';
+    const isAtLimit = honors.length >= MAX_HONORS;
 
-    const openAddDialog = () => {
-        setEditingHonor(null);
-        form.reset({ title: '', gradeLevels: [], recognitionLevels: [] });
-        setDialogOpen(true);
-    };
-
-    const openEditDialog = (honor: Honor) => {
-        setEditingHonor(honor);
-        form.reset({
-            title: honor.title,
-            gradeLevels: honor.gradeLevels,
-            recognitionLevels: honor.recognitionLevels,
-        });
-        setDialogOpen(true);
-    };
-
-    const handleDialogChange = (open: boolean) => {
-        setDialogOpen(open);
-        if (!open) {
-            setEditingHonor(null);
-            form.reset();
+    // Sync from store
+    useEffect(() => {
+        if (profileData.honors) {
+            setHonors(profileData.honors);
         }
+    }, [profileData.honors]);
+
+    const updateHonors = (newHonors: Honor[]) => {
+        setHonors(newHonors);
+        updateStoreHonors(newHonors);
+        toast.success(editingId ? 'Honor updated successfully.' : 'Honor added successfully.');
     };
 
-    const onSubmit = (formData: HonorFormData) => {
-        if (editingHonor) {
-            // Update existing
-            const updated = honors.map((h) =>
-                h.id === editingHonor.id ? { ...h, ...formData } : h
-            );
-            setHonors(updated);
-            toast.success('Honor updated successfully.');
+    const onSubmit = (data: HonorFormData) => {
+        let newHonors: Honor[];
+        if (editingId) {
+            newHonors = honors.map((h) => (h.id === editingId ? { ...data, id: editingId } : h));
         } else {
-            // Add new
             const newHonor: Honor = {
-                id: Date.now().toString(),
-                ...formData,
+                ...data,
+                id: crypto.randomUUID(),
             };
-            setHonors([...honors, newHonor]);
-            toast.success('Honor added successfully.');
+            newHonors = [...honors, newHonor];
         }
-        setDialogOpen(false);
-        setEditingHonor(null);
+        updateHonors(newHonors);
         form.reset();
+        setEditingId(null);
+        setDialogOpen(false);
     };
 
     const deleteHonor = (id: string) => {
-        setHonors(honors.filter((h) => h.id !== id));
+        const newHonors = honors.filter((h) => h.id !== id);
+        updateHonors(newHonors);
         toast.success('Honor removed.');
     };
 
@@ -240,7 +260,28 @@ export default function HonorsTab() {
         if (over && active.id !== over.id) {
             const oldIndex = honors.findIndex((h) => h.id === active.id);
             const newIndex = honors.findIndex((h) => h.id === over.id);
-            setHonors(arrayMove(honors, oldIndex, newIndex));
+            const newHonors = arrayMove(honors, oldIndex, newIndex);
+            updateHonors(newHonors);
+        }
+    };
+
+    const openEditDialog = (honor: Honor) => {
+        setEditingId(honor.id);
+        form.reset({
+            title: honor.title,
+            gradeLevels: honor.gradeLevels,
+            recognitionLevels: honor.recognitionLevels,
+            status: honor.status || 'draft',
+            appearOnProfile: honor.appearOnProfile || false,
+        });
+        setDialogOpen(true);
+    };
+
+    const handleDialogChange = (open: boolean) => {
+        setDialogOpen(open);
+        if (!open) {
+            form.reset({ status: 'draft', appearOnProfile: false });
+            setEditingId(null);
         }
     };
 
@@ -248,38 +289,238 @@ export default function HonorsTab() {
 
     return (
         <div className="space-y-6">
-            {/* Header Row */}
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                        Academic Honors ({honors.length}/{MAX_HONORS})
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Report up to {MAX_HONORS} honors or awards you have received.
+                    <h2 className="text-xl font-semibold">Honors & Awards</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Add your academic honors and awards ({honors.length}/{MAX_HONORS})
                     </p>
                 </div>
-                <Button
-                    onClick={openAddDialog}
-                    disabled={honors.length >= MAX_HONORS}
-                    className="bg-[#C26E26] hover:bg-[#A85A1E] text-white"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Honor
-                </Button>
+                <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+                    <DialogTrigger asChild>
+                        <Button
+                            className="bg-[#C26E26] hover:bg-[#A55A1F] text-white"
+                            disabled={isAtLimit}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Honor
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {editingId ? 'Edit Honor' : 'Add Honor'}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+
+                                {/* Top Controls: Status and Visibility */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                    <FormField
+                                        control={form.control}
+                                        name="status"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-3">
+                                                <FormLabel>Status</FormLabel>
+                                                <FormControl>
+                                                    <RadioGroup
+                                                        onValueChange={field.onChange}
+                                                        defaultValue={field.value}
+                                                        className="flex gap-4"
+                                                    >
+                                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                                            <FormControl>
+                                                                <RadioGroupItem value="draft" />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal text-muted-foreground">
+                                                                Draft
+                                                            </FormLabel>
+                                                        </FormItem>
+                                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                                            <FormControl>
+                                                                <RadioGroupItem value="ready" />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal font-semibold text-green-700">
+                                                                Ready
+                                                            </FormLabel>
+                                                        </FormItem>
+                                                    </RadioGroup>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="appearOnProfile"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 bg-white shadow-sm">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                                <div className="space-y-1 leading-none">
+                                                    <FormLabel>
+                                                        Show on Profile Section
+                                                    </FormLabel>
+                                                    <FormDescription>
+                                                        If checked, this will appear in your official Profile summary.
+                                                    </FormDescription>
+                                                </div>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                {/* Title */}
+                                <FormField
+                                    control={form.control}
+                                    name="title"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <div className="flex items-center justify-between">
+                                                <FormLabel>Waitlist / Honor Title <span className="text-red-500">*</span></FormLabel>
+                                                <CharacterCounter current={watchTitle.length} max={100} />
+                                            </div>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="e.g., National Merit Finalist"
+                                                    maxLength={100}
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/* Grade Levels */}
+                                <FormField
+                                    control={form.control}
+                                    name="gradeLevels"
+                                    render={() => (
+                                        <FormItem>
+                                            <FormLabel>Grade Level(s) <span className="text-red-500">*</span></FormLabel>
+                                            <div className="flex flex-wrap gap-4 mt-2">
+                                                {GRADE_LEVELS.map((grade) => (
+                                                    <FormField
+                                                        key={grade}
+                                                        control={form.control}
+                                                        name="gradeLevels"
+                                                        render={({ field }) => (
+                                                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                                                <FormControl>
+                                                                    <Checkbox
+                                                                        checked={field.value?.includes(grade)}
+                                                                        onCheckedChange={(checked) => {
+                                                                            const current = field.value || [];
+                                                                            if (checked) {
+                                                                                field.onChange([...current, grade]);
+                                                                            } else {
+                                                                                field.onChange(current.filter((v) => v !== grade));
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <Label className="text-sm font-normal cursor-pointer">
+                                                                    {grade}
+                                                                </Label>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/* Recognition Levels */}
+                                <FormField
+                                    control={form.control}
+                                    name="recognitionLevels"
+                                    render={() => (
+                                        <FormItem>
+                                            <FormLabel>Level of Recognition <span className="text-red-500">*</span></FormLabel>
+                                            <div className="flex flex-wrap gap-4 mt-2">
+                                                {RECOGNITION_LEVELS.map((level) => (
+                                                    <FormField
+                                                        key={level}
+                                                        control={form.control}
+                                                        name="recognitionLevels"
+                                                        render={({ field }) => (
+                                                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                                                <FormControl>
+                                                                    <Checkbox
+                                                                        checked={field.value?.includes(level)}
+                                                                        onCheckedChange={(checked) => {
+                                                                            const current = field.value || [];
+                                                                            if (checked) {
+                                                                                field.onChange([...current, level]);
+                                                                            } else {
+                                                                                field.onChange(current.filter((v) => v !== level));
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <Label className="text-sm font-normal cursor-pointer">
+                                                                    {level}
+                                                                </Label>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => handleDialogChange(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        className="bg-[#C26E26] hover:bg-[#A55A1F] text-white"
+                                    >
+                                        {editingId ? 'Save Changes' : 'Add Honor'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </Form>
+                    </DialogContent>
+                </Dialog>
             </div>
 
-            {/* Empty state */}
+            {/* Empty State */}
             {honors.length === 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-                    <Award className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg mb-2">No honors added yet</p>
-                    <p className="text-gray-400 text-sm">
-                        Click &quot;Add Honor&quot; to report your awards and recognitions.
-                    </p>
-                </div>
+                <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                        <p className="text-muted-foreground mb-4">
+                            No honors added yet
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDialogOpen(true)}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add your first honor
+                        </Button>
+                    </CardContent>
+                </Card>
             )}
 
-            {/* Honors Cards */}
+            {/* Honors List */}
             {honors.length > 0 && (
                 <DndContext
                     sensors={sensors}
@@ -290,8 +531,8 @@ export default function HonorsTab() {
                         items={honors.map((h) => h.id)}
                         strategy={verticalListSortingStrategy}
                     >
-                        <div className="grid gap-4">
-                            {honors.map((honor) => (
+                        <div className="space-y-4">
+                            {honors.map((honor, index) => (
                                 <SortableHonorCard
                                     key={honor.id}
                                     honor={honor}
@@ -304,150 +545,6 @@ export default function HonorsTab() {
                 </DndContext>
             )}
 
-            {/* Add / Edit Dialog */}
-            <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {editingHonor ? 'Edit Honor' : 'Add Honor'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {editingHonor
-                                ? 'Update the details for this honor.'
-                                : 'Provide details about your honor or award.'}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-2">
-                            {/* Title */}
-                            <FormField
-                                control={form.control}
-                                name="title"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>
-                                            Title <span className="text-red-500">*</span>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Enter honor title (max 100 chars)"
-                                                maxLength={100}
-                                                className="focus-visible:ring-[#C26E26]"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <p className="text-xs text-gray-500 text-right">
-                                            {field.value.length}/100
-                                        </p>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            {/* Grade Levels */}
-                            <FormField
-                                control={form.control}
-                                name="gradeLevels"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>
-                                            Grade Level(s) <span className="text-red-500">*</span>
-                                        </FormLabel>
-                                        <div className="flex flex-wrap gap-4 mt-2">
-                                            {GRADE_LEVELS.map((grade) => (
-                                                <div key={grade} className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id={`honor-grade-${grade}`}
-                                                        checked={field.value?.includes(grade)}
-                                                        onCheckedChange={(checked) => {
-                                                            if (checked) {
-                                                                field.onChange([...field.value, grade]);
-                                                            } else {
-                                                                field.onChange(
-                                                                    field.value.filter((v: string) => v !== grade)
-                                                                );
-                                                            }
-                                                        }}
-                                                        className="border-[#C26E26] data-[state=checked]:bg-[#C26E26] data-[state=checked]:border-[#C26E26]"
-                                                    />
-                                                    <Label
-                                                        htmlFor={`honor-grade-${grade}`}
-                                                        className="text-sm cursor-pointer"
-                                                    >
-                                                        {grade}
-                                                    </Label>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            {/* Recognition Levels */}
-                            <FormField
-                                control={form.control}
-                                name="recognitionLevels"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>
-                                            Level of Recognition{' '}
-                                            <span className="text-red-500">*</span>
-                                        </FormLabel>
-                                        <div className="flex flex-wrap gap-4 mt-2">
-                                            {RECOGNITION_LEVELS.map((level) => (
-                                                <div key={level} className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id={`honor-recognition-${level}`}
-                                                        checked={field.value?.includes(level)}
-                                                        onCheckedChange={(checked) => {
-                                                            if (checked) {
-                                                                field.onChange([...field.value, level]);
-                                                            } else {
-                                                                field.onChange(
-                                                                    field.value.filter(
-                                                                        (v: string) => v !== level
-                                                                    )
-                                                                );
-                                                            }
-                                                        }}
-                                                        className="border-[#C26E26] data-[state=checked]:bg-[#C26E26] data-[state=checked]:border-[#C26E26]"
-                                                    />
-                                                    <Label
-                                                        htmlFor={`honor-recognition-${level}`}
-                                                        className="text-sm cursor-pointer"
-                                                    >
-                                                        {level}
-                                                    </Label>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            {/* Submit */}
-                            <div className="flex justify-end gap-3 pt-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleDialogChange(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    className="bg-[#C26E26] hover:bg-[#A85A1E] text-white"
-                                >
-                                    {editingHonor ? 'Save Changes' : 'Add Honor'}
-                                </Button>
-                            </div>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

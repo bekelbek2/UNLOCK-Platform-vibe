@@ -202,6 +202,54 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
     // Destructure specifically to avoid "any" implicit issues if possible, although data is typed
     const { personal, family, education, testScores, activities, honors, essays, recommendations, finance } = data;
 
+    const formatMoney = (amount: unknown) => {
+        const num = typeof amount === 'number' ? amount : 0;
+        return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' }).replace(/\.00$/, '');
+    };
+
+    // Financial Calculations
+    const incomes = (finance.incomes as any[]) || [];
+    const assets = (finance.assets as any[]) || [];
+    const debts = (finance.debts as any[]) || [];
+    const otherExpenses = (finance.otherExpenses as any[]) || [];
+
+    const totalIncome = incomes.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const totalAssets = assets.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+
+    // Static expenses
+    const getExp = (val: unknown) => (typeof val === 'number' ? val : 0);
+    const staticExpensesTotal =
+        getExp(finance.rentOrMortgage) +
+        getExp(finance.utilities) +
+        getExp(finance.foodAndHousehold) +
+        getExp(finance.clothingAndPersonal) +
+        getExp(finance.medicalExpenses) +
+        getExp(finance.transportation) +
+        getExp(finance.educationFees) +
+        getExp(finance.booksAndSupplies) +
+        getExp(finance.insurance) +
+        getExp(finance.otherTaxes) +
+        getExp(finance.debtPayments) +
+        getExp(finance.emergencyFund);
+
+    const otherExpensesTotal = otherExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const debtsTotal = debts.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const taxesPaid = incomes.reduce((sum, item) => sum + (Number(item.taxPaid) || 0), 0);
+
+    const totalExpenses = staticExpensesTotal + otherExpensesTotal + debtsTotal + taxesPaid;
+
+    // New breakdown variables
+    const netIncome = totalIncome - taxesPaid;
+    const livingExpenses = staticExpensesTotal + otherExpensesTotal;
+
+    const availableIncome = Math.max(0, totalIncome - totalExpenses);
+
+    // Use the user's overridden EFC if available, otherwise calculate
+    const calculatedEFC = Math.round((availableIncome * 0.20) + (totalAssets * 0.05));
+    const finalEFC = typeof finance.expectedFamilyContribution === 'number'
+        ? finance.expectedFamilyContribution
+        : calculatedEFC;
+
     const fullName = `${getString(personal.firstName)} ${getString(personal.lastName)}`.trim() || 'Student Profile';
     const currentDate = format(new Date(), 'MMMM d, yyyy');
 
@@ -529,16 +577,79 @@ export const ProfileDocument: React.FC<ProfileDocumentProps> = ({ data, document
                 {Object.keys(finance).length > 0 && (
                     <View style={styles.section} wrap={false}>
                         <Text style={styles.sectionTitle}>Financial Information</Text>
-                        {Object.entries(finance).map(([key, value]) => (
-                            <View key={key} style={styles.row}>
-                                <Text style={styles.label}>
-                                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}:
-                                </Text>
-                                <Text style={styles.value}>
-                                    {typeof value === 'number' ? value.toLocaleString('en-US', { style: 'currency', currency: 'USD' }).replace('.00', '') : (value ? String(value) : '-')}
-                                </Text>
+
+                        {/* Summary Grid */}
+                        <View style={styles.table}>
+                            <View style={[styles.tableRow, styles.tableHeader]}>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>Net Income</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>Assets</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>Debts</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>Expenses</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>Need (Calc)</Text></View>
                             </View>
-                        ))}
+                            <View style={styles.tableRow}>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>{formatMoney(netIncome)}</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>{formatMoney(totalAssets)}</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>{formatMoney(debtsTotal)}</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={styles.tableCell}>{formatMoney(livingExpenses)}</Text></View>
+                                <View style={{ ...styles.tableCol, width: '20%' }}><Text style={{ ...styles.tableCell, fontWeight: 'bold', color: '#C26E26' }}>{formatMoney(calculatedEFC)}</Text></View>
+                            </View>
+                        </View>
+
+                        {/* Incomes List */}
+                        {incomes.length > 0 && (
+                            <View style={{ marginTop: 10 }}>
+                                <Text style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 4 }}>Annual Income Sources</Text>
+                                {incomes.map((inc, i) => (
+                                    <View key={i} style={styles.row}>
+                                        <Text style={{ ...styles.value, width: '70%' }}>• {inc.source} <Text style={{ fontSize: 9, fontStyle: 'italic', color: '#666' }}>({inc.type})</Text></Text>
+                                        <Text style={{ ...styles.value, width: '30%', textAlign: 'right' }}>{formatMoney(inc.amount)}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Assets List */}
+                        {assets.length > 0 && (
+                            <View style={{ marginTop: 10 }}>
+                                <Text style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 4 }}>Assets & Savings</Text>
+                                {assets.map((asst, i) => (
+                                    <View key={i} style={styles.row}>
+                                        <Text style={{ ...styles.value, width: '70%' }}>• {asst.source} <Text style={{ fontSize: 9, fontStyle: 'italic', color: '#666' }}>({asst.type})</Text></Text>
+                                        <Text style={{ ...styles.value, width: '30%', textAlign: 'right' }}>{formatMoney(asst.value)}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Expenses Summary */}
+                        <View style={{ marginTop: 10 }}>
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 4 }}>Expenses Breakdown</Text>
+
+                            <View style={styles.row}>
+                                <Text style={{ ...styles.value, width: '70%' }}>• Calculated Taxes Paid</Text>
+                                <Text style={{ ...styles.value, width: '30%', textAlign: 'right' }}>{formatMoney(taxesPaid)}</Text>
+                            </View>
+
+                            <View style={styles.row}>
+                                <Text style={{ ...styles.value, width: '70%' }}>• Standard Living Expenses (Rent, Food, etc.)</Text>
+                                <Text style={{ ...styles.value, width: '30%', textAlign: 'right' }}>{formatMoney(staticExpensesTotal)}</Text>
+                            </View>
+
+                            {debts.length > 0 && (
+                                <View style={styles.row}>
+                                    <Text style={{ ...styles.value, width: '70%' }}>• Debt Repayments</Text>
+                                    <Text style={{ ...styles.value, width: '30%', textAlign: 'right' }}>{formatMoney(debtsTotal)}</Text>
+                                </View>
+                            )}
+
+                            {otherExpenses.length > 0 && (
+                                <View style={styles.row}>
+                                    <Text style={{ ...styles.value, width: '70%' }}>• Other Expenses</Text>
+                                    <Text style={{ ...styles.value, width: '30%', textAlign: 'right' }}>{formatMoney(otherExpensesTotal)}</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 )}
 

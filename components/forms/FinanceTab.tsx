@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useMemo, useEffect, memo } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { DollarSign, AlertCircle, TrendingUp, HandCoins, Building2, Calculator, ArrowRightLeft, Pencil, Check } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileData, IncomeItem, AssetItem, OtherExpenseItem, DebtItem } from '@/lib/profileStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +17,6 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
-    FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,37 +25,48 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { formatCurrency } from '@/lib/utils';
+import { DynamicFinanceSection } from '@/components/forms/finance/DynamicFinanceSection';
 
 // ─── 1. Zod Schema ───────────────────────────────────────────────────────────
 
+const incomeItemSchema = z.object({
+    id: z.string(),
+    source: z.string().min(1, "Source is required"),
+    amount: z.number().min(0),
+    taxPaid: z.number().min(0).optional(),
+    isTaxable: z.boolean().optional(),
+    type: z.string().min(1),
+});
+
+const assetItemSchema = z.object({
+    id: z.string(),
+    source: z.string().min(1, "Source is required"),
+    value: z.number().min(0),
+    type: z.string().min(1),
+});
+
+const otherExpenseItemSchema = z.object({
+    id: z.string(),
+    source: z.string().min(1, "Description is required"),
+    amount: z.number().min(0),
+});
+
+const debtItemSchema = z.object({
+    id: z.string(),
+    source: z.string().min(1, "Description is required"),
+    amount: z.number().min(0),
+});
+
 const financeSchema = z.object({
-    // A) Parents' Income
-    fatherGrossIncome: z.number().min(0).optional(),
-    motherGrossIncome: z.number().min(0).optional(),
-    otherIncome: z.number().min(0).optional(),
-    totalTaxPaid: z.number().min(0).optional(),
+    // Dynamic Arrays
+    incomes: z.array(incomeItemSchema),
+    assets: z.array(assetItemSchema),
+    otherExpenses: z.array(otherExpenseItemSchema),
+    debts: z.array(debtItemSchema),
 
-    // B) Assets
-    savings: z.number().min(0).optional(),
-    investments: z.number().min(0).optional(),
-
-    // Real Estate Logic
-    ownsHome: z.boolean().default(false),
-    homeMarketValue: z.number().min(0).optional(),
-    homeMortgage: z.number().min(0).optional(),
-
-    // C) Student's Finances
-    studentSavings: z.number().min(0).optional(),
-    studentGrants: z.number().min(0).optional(),
-
-    // D) Expenses (Detailed Breakdown)
+    // Static Expenses (Detailed Breakdown)
     rentOrMortgage: z.number().min(0).optional(),
     utilities: z.number().min(0).optional(),
     foodAndHousehold: z.number().min(0).optional(),
@@ -70,109 +80,66 @@ const financeSchema = z.object({
     debtPayments: z.number().min(0).optional(),
     emergencyFund: z.number().min(0).optional(),
 
-    // E) Calculated Need
-    expectedFamilyContribution: z.number().min(0, 'Amount must be positive'),
+    // Calculated Need
+    expectedFamilyContribution: z.number().min(0, 'Amount must be positive').optional(),
 });
 
 type FinanceFormData = z.infer<typeof financeSchema>;
 
-// ─── 2. Helpers ──────────────────────────────────────────────────────────────
+// ─── Sub-Components ─────────────────────────────────────────────────────────
 
-// ─── 2. Helpers ──────────────────────────────────────────────────────────────
+// Memoized MoneyInput to prevent unnecessary re-renders
+const MoneyInput = memo(({ name, label, control, placeholder }: { name: keyof FinanceFormData, label: string, control: any, placeholder?: string }) => (
+    <FormField
+        control={control}
+        name={name}
+        render={({ field }) => (
+            <FormItem>
+                <FormLabel>{label}</FormLabel>
+                <FormControl>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                            $
+                        </span>
+                        <Input
+                            // @ts-ignore
+                            {...field}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder={placeholder || "0"}
+                            value={typeof field.value === 'number' && field.value !== undefined
+                                ? field.value.toLocaleString('en-US')
+                                : ''}
+                            onChange={(e) => {
+                                const raw = e.target.value.replace(/[^0-9]/g, '');
+                                const val = raw ? parseInt(raw, 10) : undefined;
+                                field.onChange(val);
+                            }}
+                            className="pl-8"
+                        />
+                    </div>
+                </FormControl>
+                <FormMessage />
+            </FormItem>
+        )}
+    />
+));
+MoneyInput.displayName = 'MoneyInput';
 
-function formatCurrency(value: number) {
-    return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-}
-
-// ─── 3. Component ────────────────────────────────────────────────────────────
-
-// Import the new component
-import { ExpenseBreakdown } from '@/components/forms/finance/ExpenseBreakdown';
-
-export default function FinanceTab() {
-    const { data: profileData, updateFinance } = useProfileData();
-    const router = useRouter();
-    // @ts-ignore
-    const { family } = profileData;
-
-    // Parent Logic
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parent1 = (family?.parent1 || {}) as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parent2 = (family?.parent2 || {}) as any;
-
-    // Default to displaying unless explicitly set to 'no' (to handle empty states graciously, or strict? User said "passed away", so strict 'no' check)
-    // Actually, if data is missing, we should probably show it or ask? 
-    // User said: "if some one's one parent passed away long ago, they shouldnt have income section"
-    // So ONLY show if isLiving !== 'no'
-    const parent1Living = parent1.isLiving !== 'no';
-    const parent2Living = parent2.isLiving !== 'no';
-
-    const parent1Name = parent1.firstName || "Father/Parent 1";
-    const parent2Name = parent2.firstName || "Mother/Parent 2";
-
-    // Initialize Form
-    const form = useForm<FinanceFormData>({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        resolver: zodResolver(financeSchema) as any,
-        defaultValues: {
-            fatherGrossIncome: undefined,
-            motherGrossIncome: undefined,
-            otherIncome: undefined,
-            totalTaxPaid: undefined,
-            savings: undefined,
-            investments: undefined,
-            ownsHome: false,
-            homeMarketValue: undefined,
-            homeMortgage: undefined,
-            studentSavings: undefined,
-            studentGrants: undefined,
-
-            // New Expense Fields
-            rentOrMortgage: undefined,
-            utilities: undefined,
-            foodAndHousehold: undefined,
-            clothingAndPersonal: undefined,
-            medicalExpenses: undefined,
-            transportation: undefined,
-            educationFees: undefined,
-            booksAndSupplies: undefined,
-            insurance: undefined,
-            otherTaxes: undefined,
-            debtPayments: undefined,
-            emergencyFund: undefined,
-
-            expectedFamilyContribution: undefined,
-            ...profileData.finance, // Load existing data
-        },
-    });
-
-    // Watch values for real-time calculation & conditional rendering
-    const values = form.watch();
-
-    // ─── Smart Calculations ──────────────────────────────────────────────────
+// Separate Summary Component to isolate re-renders from calculations
+function FinancialSummary({ control }: { control: any }) {
+    const values = useWatch({ control });
 
     const calculations = useMemo(() => {
         const getVal = (v: number | undefined) => v || 0;
 
-        const totalIncome =
-            getVal(values.fatherGrossIncome) +
-            getVal(values.motherGrossIncome) +
-            getVal(values.otherIncome);
+        const totalIncomeGross = (values.incomes || []).reduce((sum: number, item: IncomeItem) => sum + (item.amount || 0), 0);
+        const totalTaxPaid = (values.incomes || []).reduce((sum: number, item: IncomeItem) => sum + (item.taxPaid || 0), 0);
 
-        // Only count home equity if they own the home
-        const netHomeEquity = values.ownsHome
-            ? Math.max(0, getVal(values.homeMarketValue) - getVal(values.homeMortgage))
-            : 0;
+        const totalAssets = (values.assets || []).reduce((sum: number, item: AssetItem) => sum + (item.value || 0), 0);
 
-        const totalAssets =
-            getVal(values.savings) +
-            getVal(values.investments) +
-            netHomeEquity +
-            getVal(values.studentSavings);
-
-        // Updated Summation for Detailed Expenses
-        const totalExpenses =
+        // Static Expenses
+        const staticExpensesTotal =
             getVal(values.rentOrMortgage) +
             getVal(values.utilities) +
             getVal(values.foodAndHousehold) +
@@ -186,23 +153,204 @@ export default function FinanceTab() {
             getVal(values.debtPayments) +
             getVal(values.emergencyFund);
 
-        // Suggested EFC (15% of Income + 5% of Assets - 50% of Expenses (heuristic adjustment))
-        // Adjusted logic: Income - Expenses = Available. 20% of Available + 5% Assets?
-        // Staying simple as per previous logic, but maybe subtracting expenses makes sense?
-        // User asked for "Real Available Income", but didn't specify EFC formula change.
-        // I will keep EFC simple but maybe display "Available Income" too?
-        // "This allows the system to calculate the 'Real Available Income' for university fees."
 
-        const availableIncome = Math.max(0, totalIncome - totalExpenses);
+        const otherExpensesTotal = (values.otherExpenses || []).reduce((sum: number, item: OtherExpenseItem) => sum + (item.amount || 0), 0);
+        const totalDebts = (values.debts || []).reduce((sum: number, item: DebtItem) => sum + (item.amount || 0), 0);
 
-        // Let's refine EFC to use Available Income if meaningful, else stik to standard. 
-        // Standard EFC often ignores expenses except taxes. 
-        // But for this "Advanced" tab, let's use:
-        // EFC = 20% of (Income - Expenses) + 5% of Assets
+        // Tax is now considered an expense
+        const totalExpenses = staticExpensesTotal + otherExpensesTotal + totalDebts + totalTaxPaid;
+
+        // New Layout Vars
+        const netIncome = totalIncomeGross - totalTaxPaid;
+        const livingExpenses = staticExpensesTotal + otherExpensesTotal;
+
+        // Available Income logic (remains same for EFC calc, or should I use net?)
+        // EFC formula usually uses AGI or Net. Sticking to existing logic for consistency unless asked.
+        const availableIncome = Math.max(0, totalIncomeGross - totalExpenses);
+
+        // EFC: 20% of (Available Income) + 5% of Assets
         const suggestedEFC = Math.round((availableIncome * 0.20) + (totalAssets * 0.05));
 
-        return { totalIncome, totalAssets, totalExpenses, suggestedEFC, netHomeEquity, availableIncome };
+        return {
+            totalIncome: totalIncomeGross,
+            netIncome,
+            totalTaxPaid,
+            totalAssets,
+            totalDebts,
+            livingExpenses,
+            totalExpenses,
+            suggestedEFC,
+            availableIncome
+        };
     }, [values]);
+
+    return (
+        <Card className="bg-slate-50 border-slate-200 mt-8">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    Financial Summary
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="p-4 bg-white rounded-lg border shadow-sm">
+                        <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold mb-1">Net Income</p>
+                        <p className="text-2xl font-bold text-teal-600">{formatCurrency(calculations.netIncome)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">After Tax</p>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg border shadow-sm">
+                        <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold mb-1">Assets</p>
+                        <p className="text-2xl font-bold text-blue-600">{formatCurrency(calculations.totalAssets)}</p>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg border shadow-sm">
+                        <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold mb-1">Debts</p>
+                        <p className="text-2xl font-bold text-orange-600">{formatCurrency(calculations.totalDebts)}</p>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg border shadow-sm">
+                        <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold mb-1">Expenses</p>
+                        <p className="text-2xl font-bold text-red-600">{formatCurrency(calculations.livingExpenses)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Living Expenses</p>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg border shadow-sm">
+                        <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold mb-1">Calculated Need</p>
+                        <p className="text-2xl font-bold text-purple-600">{formatCurrency(calculations.suggestedEFC)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Estimated Family Contribution</p>
+                    </div>
+                </div>
+
+                <div className="mt-8 p-4 bg-orange-50/50 rounded-lg border border-orange-100">
+                    <MoneyInput
+                        control={control}
+                        name="expectedFamilyContribution"
+                        label="Final Expected Family Contribution (You can override)"
+                        placeholder={calculations.suggestedEFC.toString()}
+                    />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+// Top Summary separate for layout reasons
+function FinancialHeaderSummary({ control }: { control: any }) {
+    const values = useWatch({ control });
+
+    const calculations = useMemo(() => {
+        const getVal = (v: number | undefined) => v || 0;
+
+        const totalIncomeGross = (values.incomes || []).reduce((sum: number, item: IncomeItem) => sum + (item.amount || 0), 0);
+
+        const staticExpensesTotal =
+            getVal(values.rentOrMortgage) +
+            getVal(values.utilities) +
+            getVal(values.foodAndHousehold) +
+            getVal(values.clothingAndPersonal) +
+            getVal(values.medicalExpenses) +
+            getVal(values.transportation) +
+            getVal(values.educationFees) +
+            getVal(values.booksAndSupplies) +
+            getVal(values.insurance) +
+            getVal(values.otherTaxes) +
+            getVal(values.debtPayments) +
+            getVal(values.emergencyFund);
+
+        const otherExpensesTotal = (values.otherExpenses || []).reduce((sum: number, item: OtherExpenseItem) => sum + (item.amount || 0), 0);
+        const totalDebts = (values.debts || []).reduce((sum: number, item: DebtItem) => sum + (item.amount || 0), 0);
+        const totalTaxPaid = (values.incomes || []).reduce((sum: number, item: IncomeItem) => sum + (item.taxPaid || 0), 0);
+
+        const totalExpenses = staticExpensesTotal + otherExpensesTotal + totalDebts + totalTaxPaid;
+
+        return { totalIncome: totalIncomeGross, totalExpenses };
+    }, [values]);
+
+    return (
+        <div className="flex gap-2">
+            <div className="bg-teal-900 text-white p-3 rounded-lg shadow-sm flex items-center gap-3 min-w-[160px]">
+                <div className="p-2 bg-white/10 rounded-full">
+                    <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                    <p className="text-xs text-teal-100 font-medium uppercase tracking-wider">Total Income</p>
+                    <p className="text-xl font-bold">{formatCurrency(calculations.totalIncome)}</p>
+                </div>
+            </div>
+            <div className="bg-slate-900 text-white p-3 rounded-lg shadow-sm flex items-center gap-3 min-w-[160px]">
+                <div className="p-2 bg-white/10 rounded-full">
+                    <TrendingDown className="w-5 h-5" />
+                </div>
+                <div>
+                    <p className="text-xs text-slate-300 font-medium uppercase tracking-wider">Total Expenses</p>
+                    <p className="text-xl font-bold">{formatCurrency(calculations.totalExpenses)}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Component ────────────────────────────────────────────────────────────
+
+export default function FinanceTab() {
+    const { data: profileData, updateFinance } = useProfileData();
+
+    // Initialize Form
+    const form = useForm<FinanceFormData>({
+        resolver: zodResolver(financeSchema),
+        defaultValues: {
+            incomes: (profileData.finance?.incomes as IncomeItem[]) || [],
+            assets: (profileData.finance?.assets as AssetItem[]) || [],
+            otherExpenses: (profileData.finance?.otherExpenses as OtherExpenseItem[]) || [],
+            debts: (profileData.finance?.debts as DebtItem[]) || [],
+
+            rentOrMortgage: profileData.finance?.rentOrMortgage as number | undefined,
+            utilities: profileData.finance?.utilities as number | undefined,
+            foodAndHousehold: profileData.finance?.foodAndHousehold as number | undefined,
+            clothingAndPersonal: profileData.finance?.clothingAndPersonal as number | undefined,
+            medicalExpenses: profileData.finance?.medicalExpenses as number | undefined,
+            transportation: profileData.finance?.transportation as number | undefined,
+            educationFees: profileData.finance?.educationFees as number | undefined,
+            booksAndSupplies: profileData.finance?.booksAndSupplies as number | undefined,
+            insurance: profileData.finance?.insurance as number | undefined,
+            otherTaxes: profileData.finance?.otherTaxes as number | undefined,
+            debtPayments: profileData.finance?.debtPayments as number | undefined,
+            emergencyFund: profileData.finance?.emergencyFund as number | undefined,
+
+            expectedFamilyContribution: profileData.finance?.expectedFamilyContribution as number | undefined,
+        },
+    });
+
+    const { fields: incomeFields, append: appendIncome, remove: removeIncome, update: updateIncome } = useFieldArray({
+        control: form.control,
+        name: "incomes",
+    });
+
+    const { fields: assetFields, append: appendAsset, remove: removeAsset, update: updateAsset } = useFieldArray({
+        control: form.control,
+        name: "assets",
+    });
+
+    const { fields: otherExpenseFields, append: appendOtherExpense, remove: removeOtherExpense, update: updateOtherExpense } = useFieldArray({
+        control: form.control,
+        name: "otherExpenses",
+    });
+
+    const { fields: debtFields, append: appendDebt, remove: removeDebt } = useFieldArray({
+        control: form.control,
+        name: "debts",
+    });
+
+    // Granular watchers to prevent global re-render on static input change
+    const incomes = useWatch({ control: form.control, name: 'incomes' });
+    const assets = useWatch({ control: form.control, name: 'assets' });
+    const debts = useWatch({ control: form.control, name: 'debts' });
+    const otherExpenses = useWatch({ control: form.control, name: 'otherExpenses' });
+
+    // Sync form with store updates
+    useEffect(() => {
+        if (profileData.finance) {
+            // Logic if needed
+        }
+    }, [profileData.finance]);
+
 
     // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -214,46 +362,8 @@ export default function FinanceTab() {
         });
     };
 
-    // Reusable Input Component
-    const MoneyInput = ({ name, label, placeholder }: { name: keyof FinanceFormData, label: string, placeholder?: string }) => (
-        <FormField
-            control={form.control}
-            name={name}
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel>{label}</FormLabel>
-                    <FormControl>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-                                $
-                            </span>
-                            <Input
-                                {...field} // spread field props (onChange, onBlur, value, ref)
-                                type="text"
-                                inputMode="numeric"
-                                placeholder={placeholder || "0"}
-                                // Handle value safely for display
-                                value={typeof field.value === 'number' && field.value !== undefined
-                                    ? field.value.toLocaleString('en-US')
-                                    : ''}
-                                // Custom onChange to parse string back to number
-                                onChange={(e) => {
-                                    const raw = e.target.value.replace(/[^0-9]/g, '');
-                                    const val = raw ? parseInt(raw, 10) : undefined;
-                                    field.onChange(val);
-                                }}
-                                className="pl-8"
-                            />
-                        </div>
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-    );
-
     return (
-        <div className="max-w-4xl space-y-6">
+        <div className="max-w-4xl space-y-8">
 
             {/* ─── Header ─── */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -263,234 +373,171 @@ export default function FinanceTab() {
                         Financial Aid Profile (ISFAA)
                     </h2>
                     <p className="text-muted-foreground text-sm">
-                        Provide detailed information for need-based aid assessment (Values in USD).
+                        Manage your annual income, assets, and expenses dynamically.
                     </p>
                 </div>
+                {/* Header Summary Component */}
+                <FinancialHeaderSummary control={form.control} />
             </div>
 
-            {/* ─── Step 1: Family Summary (Read-Only) ─── */}
-            <Card className="bg-secondary/10 border-secondary/20 dashed-border">
-                <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-[#C26E26]" />
-                        Family Context (Read-Only)
-                    </CardTitle>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[#C26E26] h-8 gap-1 hover:text-[#A55A1F] hover:bg-[#C26E26]/10"
-                        // This link enables the simulation of returning to edit data
-                        onClick={() => toast.info('Please navigate to the Family tab to edit these details.')}
-                    >
-                        <Pencil className="w-3 h-3" />
-                        Edit in Family Tab
-                    </Button>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                        <span className="text-muted-foreground block text-xs uppercase tracking-wide">Parents</span>
-                        <p className="font-medium">
-                            {/* @ts-ignore */}
-                            {family.parent1?.firstName || 'Parent 1'} & {/* @ts-ignore */}
-                            {family.parent2?.firstName || 'Parent 2'}
-                        </p>
-                    </div>
-                    <div>
-                        <span className="text-muted-foreground block text-xs uppercase tracking-wide">Marital Status</span>
-                        {/* @ts-ignore */}
-                        <p className="font-medium">{family.maritalStatus || 'Not Specified'}</p>
-                    </div>
-                    <div>
-                        <span className="text-muted-foreground block text-xs uppercase tracking-wide">Siblings</span>
-                        {/* @ts-ignore */}
-                        <p className="font-medium">{family.numberOfSiblings ? `${family.numberOfSiblings} siblings` : 'None'}</p>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* ─── Form Content ─── */}
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 
-                    <Accordion type="multiple" defaultValue={['income', 'assets', 'expenses']} className="w-full space-y-4">
+                    <Accordion type="multiple" defaultValue={['income', 'assets', 'debts', 'expenses']} className="w-full space-y-6">
 
-                        {/* A) Household Income */}
-                        <AccordionItem value="income" className="border rounded-lg bg-white px-4 shadow-sm">
-                            <AccordionTrigger className="hover:no-underline py-4">
-                                <div className="flex items-center gap-3 text-left">
-                                    <div className="p-2 bg-green-100 rounded-full text-green-600">
-                                        <HandCoins className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900">Household Income (Per Year)</h3>
-                                        <p className="text-xs text-muted-foreground">Gross income before taxes for 2024</p>
-                                    </div>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 pb-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {parent1Living && (
-                                    <MoneyInput name="fatherGrossIncome" label={`${parent1Name}'s Gross Income`} />
-                                )}
-                                {parent2Living && (
-                                    <MoneyInput name="motherGrossIncome" label={`${parent2Name}'s Gross Income`} />
-                                )}
-                                <MoneyInput name="otherIncome" label="Other Income (Business/Rent)" />
-                                <MoneyInput name="totalTaxPaid" label="Total Income Tax Paid" />
-                                <div className="md:col-span-2 bg-gray-50 p-3 rounded-md flex justify-between items-center text-sm border">
-                                    <span className="font-medium text-gray-700">Total Annual Income:</span>
-                                    <span className="font-bold text-lg text-green-700">
-                                        {formatCurrency(calculations.totalIncome)}
-                                    </span>
-                                </div>
-                            </AccordionContent>
+                        {/* A) Dynamic Income */}
+                        <AccordionItem value="income" className="border-none">
+                            <DynamicFinanceSection
+                                title="Annual Income"
+                                description="Add all sources of family income (before tax)."
+                                items={(incomes || []) as IncomeItem[]}
+                                onAdd={() => appendIncome({ id: Date.now().toString(), source: '', amount: 0, taxPaid: 0, isTaxable: false, type: 'salary' })}
+                                onRemove={(id) => {
+                                    const index = (incomes || []).findIndex((i: IncomeItem) => i.id === id);
+                                    if (index !== -1) removeIncome(index);
+                                }}
+                                onUpdate={(id, field, value) => {
+                                    const index = (incomes || []).findIndex((i: IncomeItem) => i.id === id);
+                                    if (index !== -1) {
+                                        // @ts-ignore
+                                        form.setValue(`incomes.${index}.${field}`, value, {
+                                            shouldDirty: true,
+                                            shouldTouch: true,
+                                            shouldValidate: true
+                                        });
+                                    }
+                                }}
+                                type="income"
+                                icon={<TrendingUp className="w-5 h-5" />}
+                            />
                         </AccordionItem>
 
-                        {/* B) Assets */}
-                        <AccordionItem value="assets" className="border rounded-lg bg-white px-4 shadow-sm">
-                            <AccordionTrigger className="hover:no-underline py-4">
-                                <div className="flex items-center gap-3 text-left">
-                                    <div className="p-2 bg-blue-100 rounded-full text-blue-600">
-                                        <Building2 className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900">Assets & Investments</h3>
-                                        <p className="text-xs text-muted-foreground">Savings, investments, and property</p>
-                                    </div>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 pb-4 space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <MoneyInput name="savings" label="Cash & Bank Savings" />
-                                    <MoneyInput name="investments" label="Investments (Stocks, Bonds)" />
-                                </div>
-                                <Separator />
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h4 className="text-sm font-medium">Real Estate (Home)</h4>
-                                            <p className="text-xs text-muted-foreground">Do your parents own their home?</p>
-                                        </div>
-                                        <FormField
-                                            control={form.control}
-                                            name="ownsHome"
-                                            render={({ field }) => (
-                                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                                    <FormControl>
-                                                        <Switch
-                                                            checked={field.value}
-                                                            onCheckedChange={field.onChange}
-                                                        />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal">
-                                                        {field.value ? 'Yes, we own it' : 'No, we rent'}
-                                                    </FormLabel>
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    {/* Conditional Real Estate Fields */}
-                                    {values.ownsHome && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2">
-                                            <MoneyInput name="homeMarketValue" label="Current Market Value" />
-                                            <MoneyInput name="homeMortgage" label="Unpaid Mortgage Debt" />
-                                        </div>
-                                    )}
-
-                                    {values.ownsHome && calculations.netHomeEquity > 0 && (
-                                        <p className="text-xs text-muted-foreground text-right">
-                                            Net Home Equity included: <span className="font-medium text-gray-900">{formatCurrency(calculations.netHomeEquity)}</span>
-                                        </p>
-                                    )}
-                                </div>
-                            </AccordionContent>
+                        {/* B) Dynamic Assets */}
+                        <AccordionItem value="assets" className="border-none">
+                            <DynamicFinanceSection
+                                title="Assets & Savings"
+                                description="List all family assets including savings, investments, and property."
+                                items={(assets || []) as AssetItem[]}
+                                onAdd={() => appendAsset({ id: Date.now().toString(), source: '', value: 0, type: 'asset' })}
+                                onRemove={(id) => {
+                                    const index = (assets || []).findIndex((i: AssetItem) => i.id === id);
+                                    if (index !== -1) removeAsset(index);
+                                }}
+                                onUpdate={(id, field, value) => {
+                                    const index = (assets || []).findIndex((i: AssetItem) => i.id === id);
+                                    if (index !== -1) {
+                                        // @ts-ignore
+                                        form.setValue(`assets.${index}.${field}`, value, {
+                                            shouldDirty: true,
+                                            shouldTouch: true,
+                                            shouldValidate: true
+                                        });
+                                    }
+                                }}
+                                type="asset"
+                                icon={<DollarSign className="w-5 h-5" />}
+                            />
                         </AccordionItem>
 
-                        {/* C) Student Finances & Expenses */}
+                        {/* C) Debts & Liabilities */}
+                        <AccordionItem value="debts" className="border-none">
+                            <DynamicFinanceSection
+                                title="Debts & Liabilities"
+                                description="List any loans, credit card debts, or other liabilities. These will be treated as annual expenses."
+                                items={(debts || []) as DebtItem[]}
+                                onAdd={() => appendDebt({ id: Date.now().toString(), source: '', amount: 0 })}
+                                onRemove={(id) => {
+                                    const index = (debts || []).findIndex((i: DebtItem) => i.id === id);
+                                    if (index !== -1) removeDebt(index);
+                                }}
+                                onUpdate={(id, field, value) => {
+                                    const index = (debts || []).findIndex((i: DebtItem) => i.id === id);
+                                    if (index !== -1) {
+                                        // @ts-ignore
+                                        form.setValue(`debts.${index}.${field}`, value, {
+                                            shouldDirty: true,
+                                            shouldTouch: true,
+                                            shouldValidate: true
+                                        });
+                                    }
+                                }}
+                                type="expense"
+                                icon={<TrendingDown className="w-5 h-5" />}
+                            />
+                        </AccordionItem>
+
+                        {/* C) Expenses (Hybrid) */}
                         <AccordionItem value="expenses" className="border rounded-lg bg-white px-4 shadow-sm">
                             <AccordionTrigger className="hover:no-underline py-4">
                                 <div className="flex items-center gap-3 text-left">
                                     <div className="p-2 bg-purple-100 rounded-full text-purple-600">
-                                        <Calculator className="w-5 h-5" />
+                                        <TrendingDown className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900">Student Needs & Annual Expenses</h3>
-                                        <p className="text-xs text-muted-foreground">Detailed breakdown of family expenditures</p>
+                                        <h3 className="font-semibold text-gray-900">Annual Expenses</h3>
+                                        <p className="text-xs text-muted-foreground">Detailed breakdown of standard and other expenses</p>
                                     </div>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent className="pt-2 pb-4 space-y-6">
-                                <div className="bg-purple-50/50 p-4 rounded-lg border border-purple-100">
-                                    <h4 className="text-sm font-medium text-purple-900 mb-3">Student's Personal Assets</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <MoneyInput name="studentSavings" label="Student's Personal Savings" />
-                                        <MoneyInput name="studentGrants" label="External Grants/Scholarships" />
-                                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <MoneyInput control={form.control} name="rentOrMortgage" label="Rent / Mortgage" />
+                                    <MoneyInput control={form.control} name="utilities" label="Utilities" />
+                                    <MoneyInput control={form.control} name="foodAndHousehold" label="Food & Household" />
+                                    <MoneyInput control={form.control} name="clothingAndPersonal" label="Clothing/Personal" />
+                                    <MoneyInput control={form.control} name="medicalExpenses" label="Medical Expenses" />
+                                    <MoneyInput control={form.control} name="transportation" label="Transportation" />
+                                    <MoneyInput control={form.control} name="educationFees" label="Education Fees (Siblings)" />
+                                    <MoneyInput control={form.control} name="booksAndSupplies" label="Books & Supplies" />
+                                    <MoneyInput control={form.control} name="insurance" label="Insurance" />
+                                    <MoneyInput control={form.control} name="otherTaxes" label="Other Taxes" />
+                                    <MoneyInput control={form.control} name="debtPayments" label="Debt Payments" />
+                                    <MoneyInput control={form.control} name="emergencyFund" label="Emergency Fund Contribution" />
                                 </div>
-                                <Separator />
 
-                                {/* New Detailed Expense Breakdown Component */}
-                                <ExpenseBreakdown />
+                                <Separator className="my-4" />
 
+                                {/* Dynamic "Other" Expenses */}
+                                <DynamicFinanceSection
+                                    title="Other Expenses"
+                                    description="Add any other specific significant expenses (e.g. Elderly Care)."
+                                    items={(otherExpenses || []) as OtherExpenseItem[]}
+                                    onAdd={() => appendOtherExpense({ id: Date.now().toString(), source: '', amount: 0 })}
+                                    onRemove={(id) => {
+                                        const index = (otherExpenses || []).findIndex((i: OtherExpenseItem) => i.id === id);
+                                        if (index !== -1) removeOtherExpense(index);
+                                    }}
+                                    onUpdate={(id, field, value) => {
+                                        const index = (otherExpenses || []).findIndex((i: OtherExpenseItem) => i.id === id);
+                                        if (index !== -1) {
+                                            // @ts-ignore
+                                            form.setValue(`otherExpenses.${index}.${field}`, value, {
+                                                shouldDirty: true,
+                                                shouldTouch: true,
+                                                shouldValidate: true
+                                            });
+                                        }
+                                    }}
+                                    type="expense"
+                                    icon={<TrendingDown className="w-5 h-5" />}
+                                />
                             </AccordionContent>
                         </AccordionItem>
-
                     </Accordion>
 
-                    {/* ─── Step 3: Calculation & EFC ─── */}
-                    <Card className="border-[#C26E26]/20 bg-orange-50/10 shadow-sm">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Check className="w-5 h-5 text-[#C26E26]" />
-                                Financial Summary
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div className="bg-white p-3 rounded border shadow-sm">
-                                    <span className="block text-muted-foreground text-xs uppercase tracking-wide">Total Income</span>
-                                    <span className="font-bold text-lg text-gray-800">{formatCurrency(calculations.totalIncome)}</span>
-                                </div>
-                                <div className="bg-white p-3 rounded border shadow-sm">
-                                    <span className="block text-muted-foreground text-xs uppercase tracking-wide">Total Assets</span>
-                                    <span className="font-bold text-lg text-gray-800">{formatCurrency(calculations.totalAssets)}</span>
-                                </div>
-                                <div className="bg-white p-3 rounded border shadow-sm">
-                                    <span className="block text-muted-foreground text-xs uppercase tracking-wide">Total Expenses</span>
-                                    <span className="font-bold text-lg text-gray-800">{formatCurrency(calculations.totalExpenses)}</span>
-                                </div>
-                                <div className="bg-green-50 p-3 rounded border border-green-200 shadow-sm">
-                                    <span className="block text-green-700 text-xs uppercase tracking-wide">Real Available</span>
-                                    <span className="font-bold text-lg text-green-800">{formatCurrency(calculations.availableIncome)}</span>
-                                </div>
-                            </div>
+                    {/* ─── Summary Section (Bottom) ─── */}
+                    <FinancialSummary control={form.control} />
 
-                            <Separator />
-
-                            <div className="bg-white p-4 rounded-lg border-2 border-[#C26E26]/10 flex flex-col gap-4">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                    <div>
-                                        <h4 className="font-bold text-[#C26E26]">Expected Family Contribution (EFC)</h4>
-                                        <p className="text-xs text-muted-foreground">
-                                            Calculated based on 20% of Available Income + 5% of Assets.
-                                            Suggested: <strong className="text-gray-900">{formatCurrency(calculations.suggestedEFC)}</strong>
-                                        </p>
-                                    </div>
-                                </div>
-                                <MoneyInput name="expectedFamilyContribution" label="Final EFC Amount (You can override)" />
-                            </div>
-
-                            <Button
-                                type="submit"
-                                className="w-full bg-[#C26E26] hover:bg-[#A55A1F] text-white h-12 text-lg font-semibold shadow-md transition-all"
-                            >
-                                Save Financial Profile
-                            </Button>
-                        </CardContent>
-                    </Card>
+                    <div className="flex justify-end pt-4 border-t">
+                        <Button type="submit" size="lg" className="px-8 font-semibold bg-[#C26E26] hover:bg-[#A65B1E] text-white">
+                            <Check className="w-5 h-5 mr-2" />
+                            Save Financial Profile
+                        </Button>
+                    </div>
 
                 </form>
             </Form>
+
         </div>
     );
 }

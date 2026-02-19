@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Eye, EyeOff, Pencil } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -23,7 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -41,6 +41,7 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
+    FormDescription
 } from '@/components/ui/form';
 import {
     Select,
@@ -54,6 +55,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { useProfileData, type Activity } from '@/lib/profileStore';
 
 // Constants
 const ACTIVITY_TYPES = [
@@ -101,13 +103,11 @@ const activitySchema = z.object({
     hoursPerWeek: z.coerce.number().min(1, 'Required').max(168, 'Max 168 hours'),
     weeksPerYear: z.coerce.number().min(1, 'Required').max(52, 'Max 52 weeks'),
     futureIntent: z.enum(['yes', 'no'], { message: 'Select an option' }),
+    status: z.enum(['draft', 'ready']),
+    appearOnProfile: z.boolean().default(false),
 });
 
 type ActivityFormData = z.infer<typeof activitySchema>;
-
-interface Activity extends ActivityFormData {
-    id: string;
-}
 
 // Character counter component
 function CharacterCounter({ current, max }: { current: number; max: number }) {
@@ -153,77 +153,79 @@ function SortableActivityCard({
         <Card
             ref={setNodeRef}
             style={style}
-            className="hover:shadow-md transition-shadow cursor-pointer"
+            className="hover:shadow-md transition-shadow cursor-pointer group flex flex-col gap-1"
             onClick={() => onEdit(activity)}
         >
-            <CardContent className="py-4">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
+            <CardHeader className="py-3 px-4 pb-0">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
                         {/* Drag Handle */}
                         <button
                             type="button"
-                            className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+                            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
                             onClick={(e) => e.stopPropagation()}
                             {...attributes}
                             {...listeners}
                         >
                             <GripVertical className="w-5 h-5" />
                         </button>
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#C26E26]/10 text-[#C26E26] font-semibold text-sm flex-shrink-0">
-                            {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <Badge variant="secondary" className="bg-[#C26E26]/10 text-[#C26E26] hover:bg-[#C26E26]/20">
-                                    {activity.activityType}
-                                </Badge>
-                                {activity.gradeLevels.map((g) => (
-                                    <Badge key={g} variant="outline" className="text-xs">
-                                        Grade {g}
-                                    </Badge>
-                                ))}
-                            </div>
-                            <h4 className="font-semibold text-base">
-                                {activity.position}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                                {activity.organizationName}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {activity.description}
-                            </p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                <span>{activity.hoursPerWeek} hrs/week</span>
-                                <span>•</span>
-                                <span>{activity.weeksPerYear} wks/year</span>
-                                {activity.futureIntent === 'yes' && (
-                                    <>
-                                        <span>•</span>
-                                        <span className="text-[#C26E26]">Continuing in college</span>
-                                    </>
-                                )}
-                            </div>
-                        </div>
+                        <h4 className="font-bold text-lg text-gray-900 line-clamp-1">{activity.position}</h4>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(activity.id);
-                        }}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {/* Edit/Delete Actions - Visible on hover */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={(e) => { e.stopPropagation(); onEdit(activity); }}>
+                                <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); onDelete(activity.id); }}>
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        </div>
+
+                        {/* Status Badge */}
+                        {activity.status === 'ready' ? (
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 text-sm px-3 py-1">Ready</Badge>
+                        ) : (
+                            <Badge variant="outline" className="text-gray-500 border-gray-300 text-sm px-3 py-1">Draft</Badge>
+                        )}
+
+                        {/* Visibility Badge */}
+                        {activity.appearOnProfile ? (
+                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 gap-1 text-sm px-3 py-1">
+                                <Eye className="w-3 h-3" /> Visible
+                            </Badge>
+                        ) : (
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-500 hover:bg-gray-200 gap-1 text-sm px-3 py-1">
+                                <EyeOff className="w-3 h-3" /> Hidden
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="py-3 px-4 pt-1 pb-4">
+                <div className="flex flex-col gap-1 ml-8"> {/* Indent to align with title next to grip */}
+                    <div className="flex items-center gap-2 text-lg text-gray-600 font-medium">
+                        <span className="text-[#C26E26]">{activity.organizationName}</span>
+                        <span>•</span>
+                        <span>{activity.activityType}</span>
+                    </div>
+                    <p className="text-gray-600 text-lg line-clamp-2 mt-1">{activity.description}</p>
+
+                    <div className="flex items-center gap-3 mt-3">
+                        {activity.gradeLevels.length > 0 && (
+                            <span className="bg-blue-50 px-3 py-1.5 rounded border border-blue-100 font-medium text-sm text-blue-700">
+                                Grades: {activity.gradeLevels.join(', ')}
+                            </span>
+                        )}
+                        <span className="bg-green-50 px-3 py-1.5 rounded border border-green-100 font-medium text-sm text-green-700">
+                            {activity.hoursPerWeek} hrs/wk, {activity.weeksPerYear} wks/yr
+                        </span>
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
-
-import { useProfileData } from '@/lib/profileStore';
-import { useEffect } from 'react';
 
 export default function ActivitiesTab() {
     const { data: profileData, setActivities: updateStoreActivities } = useProfileData();
@@ -235,6 +237,8 @@ export default function ActivitiesTab() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(activitySchema) as any,
         defaultValues: {
+            status: 'draft',
+            appearOnProfile: false,
             activityType: '',
             position: '',
             organizationName: '',
@@ -256,14 +260,12 @@ export default function ActivitiesTab() {
     // Sync from store on load
     useEffect(() => {
         if (profileData.activities) {
-            // @ts-ignore
             setActivities(profileData.activities);
         }
     }, [profileData.activities]);
 
     const updateActivities = (newActivities: Activity[]) => {
         setActivities(newActivities);
-        // @ts-ignore
         updateStoreActivities(newActivities);
     };
 
@@ -316,7 +318,9 @@ export default function ActivitiesTab() {
             timing: activity.timing,
             hoursPerWeek: activity.hoursPerWeek,
             weeksPerYear: activity.weeksPerYear,
-            futureIntent: activity.futureIntent,
+            futureIntent: activity.futureIntent as 'yes' | 'no',
+            status: activity.status || 'draft',
+            appearOnProfile: activity.appearOnProfile || false,
         });
         setDialogOpen(true);
     };
@@ -324,7 +328,11 @@ export default function ActivitiesTab() {
     const handleDialogChange = (open: boolean) => {
         setDialogOpen(open);
         if (!open) {
-            form.reset();
+            form.reset({
+                status: 'draft',
+                appearOnProfile: false,
+                // reset others to empty to avoid uncontrolled/controlled warnings if needed
+            });
             setEditingId(null);
         }
     };
@@ -357,6 +365,67 @@ export default function ActivitiesTab() {
                         </DialogHeader>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                {/* Top Controls: Status and Visibility */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                    <FormField
+                                        control={form.control}
+                                        name="status"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-3">
+                                                <FormLabel>Status</FormLabel>
+                                                <FormControl>
+                                                    <RadioGroup
+                                                        onValueChange={field.onChange}
+                                                        defaultValue={field.value}
+                                                        className="flex gap-4"
+                                                    >
+                                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                                            <FormControl>
+                                                                <RadioGroupItem value="draft" />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal text-muted-foreground">
+                                                                Draft
+                                                            </FormLabel>
+                                                        </FormItem>
+                                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                                            <FormControl>
+                                                                <RadioGroupItem value="ready" />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal font-semibold text-green-700">
+                                                                Ready
+                                                            </FormLabel>
+                                                        </FormItem>
+                                                    </RadioGroup>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="appearOnProfile"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 bg-white shadow-sm">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                                <div className="space-y-1 leading-none">
+                                                    <FormLabel>
+                                                        Show on Profile Section
+                                                    </FormLabel>
+                                                    <FormDescription>
+                                                        If checked, this will appear in your official Profile summary.
+                                                    </FormDescription>
+                                                </div>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
                                 {/* Activity Type */}
                                 <FormField
                                     control={form.control}
@@ -669,7 +738,7 @@ export default function ActivitiesTab() {
                         items={activities.map((a) => a.id)}
                         strategy={verticalListSortingStrategy}
                     >
-                        <div className="space-y-3">
+                        <div className="space-y-4"> {/* Increased spacing */}
                             {activities.map((activity, index) => (
                                 <SortableActivityCard
                                     key={activity.id}
