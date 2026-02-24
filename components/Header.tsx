@@ -2,14 +2,16 @@
 
 import { ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
 
 interface HeaderProps {
     title: string;
     subtitle?: string;
     showBackButton?: boolean;
+    rightContent?: ReactNode;
 }
 
-export default function Header({ title, subtitle, showBackButton = true }: HeaderProps) {
+export default function Header({ title, subtitle, showBackButton = true, rightContent }: HeaderProps) {
     const router = useRouter();
 
     return (
@@ -26,10 +28,15 @@ export default function Header({ title, subtitle, showBackButton = true }: Heade
             )}
 
             {/* Title Section */}
-            <div className="px-8 pt-8 pb-6">
-                <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-                {subtitle && (
-                    <p className="mt-2 text-gray-500">{subtitle}</p>
+            <div className="px-8 pt-8 pb-6 flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
+                    {subtitle && (
+                        <p className="mt-2 text-gray-500">{subtitle}</p>
+                    )}
+                </div>
+                {rightContent && (
+                    <div className="flex-shrink-0">{rightContent}</div>
                 )}
             </div>
         </div>
