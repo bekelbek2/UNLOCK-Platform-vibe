@@ -220,9 +220,9 @@ export default function CreateStudyPlanPage() {
                 mentorName: mentors.find(m => m.id === mr.mentorId)?.full_name || 'Unassigned'
             }))
             : [
-                { role: 'Strategic', mentorName: strategicMentor?.full_name || null },
-                { role: 'Essay', mentorName: essayMentor?.full_name || null }
-            ].filter(m => m.mentorName);
+                { role: 'Strategic', mentorName: strategicMentor?.full_name || '' },
+                { role: 'Essay', mentorName: essayMentor?.full_name || '' }
+            ].filter(m => m.mentorName !== '');
 
         const payload = {
             ...data,
