@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
-import { ProfileDataProvider } from "@/lib/profileStore";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,9 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
-        <ProfileDataProvider>
-          {children}
-        </ProfileDataProvider>
+        {children}
         <Toaster position="top-right" richColors />
       </body>
     </html>

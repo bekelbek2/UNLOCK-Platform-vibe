@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useProfileData } from '../../lib/profileStore';
+import { useProfileStore } from '../../lib/profileStore';
 import { useDocumentStore } from '../../hooks/useDocumentStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -59,7 +59,7 @@ function EssayPreview({ docId }: { docId: string }) {
 }
 
 export function EssaysTab() {
-    const { data, addEssay, removeEssay } = useProfileData();
+    const { data, addEssay, removeEssay } = useProfileStore();
     const { documents } = useDocumentStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
 

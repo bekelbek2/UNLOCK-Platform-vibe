@@ -39,11 +39,11 @@ import {
     GENDERS,
     ETHNICITIES,
 } from '@/lib/schemas/personal-form';
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileStore } from '@/lib/profileStore';
 import { useEffect } from 'react';
 
 export default function PersonalTab() {
-    const { data, updatePersonal } = useProfileData();
+    const { data, updatePersonal } = useProfileStore();
 
     const form = useForm<PersonalFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

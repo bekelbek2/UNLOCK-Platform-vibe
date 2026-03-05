@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -28,11 +28,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { universities, type University } from '@/data/universities';
-import { useProgramStore, type Program } from '@/lib/programStore';
 import { useApplicationStore } from '@/lib/applicationStore';
+import { useUniversityStore, type University } from '@/lib/universityStore';
 import { toast } from 'sonner';
-import { ArrowLeft, GraduationCap, BookOpen } from 'lucide-react';
+import { ArrowLeft, GraduationCap, BookOpen, Loader2 } from 'lucide-react';
 
 const termOptions = ['Fall 2025', 'Spring 2026', 'Fall 2026', 'Spring 2027'];
 
@@ -44,9 +43,10 @@ const admissionPlanOptions = [
     'Rolling Admission',
 ];
 
-type SelectedEntity =
-    | { type: 'university'; data: University }
-    | { type: 'program'; data: Program };
+interface SelectedEntity {
+    type: 'university' | 'program';
+    data: University;
+}
 
 interface AddApplicationModalProps {
     open: boolean;
@@ -55,27 +55,32 @@ interface AddApplicationModalProps {
 
 export default function AddApplicationModal({ open, onOpenChange }: AddApplicationModalProps) {
     const { addApplication } = useApplicationStore();
-    const { programs } = useProgramStore();
 
     const [selected, setSelected] = useState<SelectedEntity | null>(null);
     const [term, setTerm] = useState('Fall 2026');
     const [admissionPlan, setAdmissionPlan] = useState('Regular Decision');
 
+    const { universities: catalog } = useUniversityStore();
+
+    // Derived universities & programs
+    const universities = catalog.filter((row: University) => row.type === 'university');
+    const programs = catalog.filter((row: University) => row.type === 'program');
+
     const handleSelect = (entity: SelectedEntity) => setSelected(entity);
     const handleBack = () => setSelected(null);
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!selected) return;
 
         const entity = selected.data;
-        addApplication({
+        await addApplication({
             universityId: entity.id,
             universityName: entity.name,
-            entityType: selected.type === 'university' ? 'university' : 'program',
-            deadline: entity.deadline,
+            entityType: selected.type,
+            deadline: '',
             term,
             admissionPlan,
-        });
+        }, entity);
 
         toast.success(`${entity.name} added to your applications!`);
 
@@ -151,14 +156,18 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                                     className="flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer"
                                                 >
                                                     <div className="w-10 h-10 rounded-md border border-gray-200 bg-white flex items-center justify-center p-1 flex-shrink-0 overflow-hidden">
-                                                        <img
-                                                            src={uni.logoUrl}
-                                                            alt={uni.name}
-                                                            className="w-full h-full object-contain"
-                                                            onError={(e) => {
-                                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                            }}
-                                                        />
+                                                        {uni.logo_url ? (
+                                                            <img
+                                                                src={uni.logo_url}
+                                                                alt={uni.name}
+                                                                className="w-full h-full object-contain"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <GraduationCap className="w-5 h-5 text-gray-300" />
+                                                        )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-semibold text-gray-900 truncate">
@@ -166,9 +175,11 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                                         </p>
                                                         <p className="text-sm text-gray-500">{uni.country}</p>
                                                     </div>
-                                                    <span className="text-xs text-gray-400 flex-shrink-0">
-                                                        #{uni.rank}
-                                                    </span>
+                                                    {uni.rank && (
+                                                        <span className="text-xs text-gray-400 flex-shrink-0">
+                                                            #{uni.rank}
+                                                        </span>
+                                                    )}
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
@@ -200,14 +211,18 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                                     className="flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer"
                                                 >
                                                     <div className="w-10 h-10 rounded-md border border-gray-200 bg-white flex items-center justify-center p-1 flex-shrink-0 overflow-hidden">
-                                                        <img
-                                                            src={prog.logoUrl}
-                                                            alt={prog.name}
-                                                            className="w-full h-full object-contain"
-                                                            onError={(e) => {
-                                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                            }}
-                                                        />
+                                                        {prog.logo_url ? (
+                                                            <img
+                                                                src={prog.logo_url}
+                                                                alt={prog.name}
+                                                                className="w-full h-full object-contain"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <BookOpen className="w-5 h-5 text-gray-300" />
+                                                        )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-semibold text-gray-900 truncate">
@@ -250,14 +265,18 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                             {/* Selected Entity */}
                             <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
                                 <div className="w-12 h-12 rounded-md border border-gray-200 bg-white flex items-center justify-center p-1 flex-shrink-0 overflow-hidden">
-                                    <img
-                                        src={selected.data.logoUrl}
-                                        alt={selected.data.name}
-                                        className="w-full h-full object-contain"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
-                                        }}
-                                    />
+                                    {selected.data.logo_url ? (
+                                        <img
+                                            src={selected.data.logo_url}
+                                            alt={selected.data.name}
+                                            className="w-full h-full object-contain"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                        />
+                                    ) : (
+                                        <GraduationCap className="w-6 h-6 text-gray-300" />
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
@@ -266,8 +285,8 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                         </p>
                                         <Badge
                                             className={`text-[10px] flex-shrink-0 ${selected.type === 'program'
-                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                : 'bg-blue-50 text-blue-700 border-blue-200'
                                                 }`}
                                         >
                                             {selected.type === 'program' ? 'Program' : 'University'}

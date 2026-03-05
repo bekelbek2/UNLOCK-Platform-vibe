@@ -39,11 +39,11 @@ import {
     RELATIONSHIP_OPTIONS,
     EDUCATION_LEVELS,
 } from '@/lib/schemas/family-form';
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileStore } from '@/lib/profileStore';
 
 
 export default function FamilyTab() {
-    const { data, updateFamily } = useProfileData();
+    const { data, updateFamily } = useProfileStore();
 
     const form = useForm<FamilyFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

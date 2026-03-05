@@ -1,6 +1,6 @@
 'use client';
 
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileStore } from '@/lib/profileStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { ArrowUpRight, EyeOff } from 'lucide-react';
 
 export function ActivitiesSummaryTab() {
-    const { data } = useProfileData();
+    const { data } = useProfileStore();
     const { activities } = data;
 
     const visibleActivities = activities?.filter(a => a.appearOnProfile) || [];

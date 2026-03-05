@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { useProfileData, type Honor } from '@/lib/profileStore';
+import { useProfileStore, type Honor } from '@/lib/profileStore';
 // import { GRADE_LEVELS, RECOGNITION_LEVELS } from '@/lib/schemas/education-form'; // Removed, now local
 
 // Constants
@@ -193,7 +193,7 @@ function SortableHonorCard({
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function HonorsTab() {
-    const { data: profileData, setHonors: updateStoreHonors } = useProfileData();
+    const { data: profileData, setHonors: updateStoreHonors } = useProfileStore();
     const [honors, setHonors] = useState<Honor[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);

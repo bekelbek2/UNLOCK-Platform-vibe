@@ -29,13 +29,11 @@ import { toast } from 'sonner';
 
 import { useApplicationStore } from '@/lib/applicationStore';
 import { useDocumentStore } from '@/hooks/useDocumentStore';
-import { useProgramStore } from '@/lib/programStore';
 import { ApplicationPDFModal } from '@/components/applications/ApplicationPDFModal';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { Badge } from '@/components/ui/badge';
-import { universities } from '@/data/universities';
 
 // ─── Available Majors ─────────────────────────────────────────────────────────
 const MAJORS = [
@@ -95,11 +93,8 @@ function WorkspaceContent() {
     const { documents } = useDocumentStore();
 
     const application = applications.find((a) => a.id === appId);
-    const { programs } = useProgramStore();
+    const uni = application?.university;
     const entityType = application?.entityType ?? 'university';
-    const catalogEntry = entityType === 'university'
-        ? universities.find((u) => u.id === application?.universityId)
-        : programs.find((p) => p.id === application?.universityId);
 
     // Local state
     const [newSupplementTitle, setNewSupplementTitle] = useState('');
@@ -172,9 +167,9 @@ function WorkspaceContent() {
                     {/* Left: University Info */}
                     <div className="flex items-center gap-4 min-w-0">
                         <div className="w-14 h-14 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
-                            {catalogEntry?.logoUrl ? (
+                            {uni?.logo_url ? (
                                 <img
-                                    src={catalogEntry.logoUrl}
+                                    src={uni.logo_url}
                                     alt={application.universityName}
                                     className="w-full h-full object-contain p-1"
                                     onError={(e) =>
@@ -192,8 +187,8 @@ function WorkspaceContent() {
                                 </h1>
                                 <Badge
                                     className={`text-[10px] flex-shrink-0 ${entityType === 'program'
-                                            ? 'bg-purple-50 text-purple-600 border-purple-200'
-                                            : 'bg-blue-50 text-blue-600 border-blue-200'
+                                        ? 'bg-purple-50 text-purple-600 border-purple-200'
+                                        : 'bg-blue-50 text-blue-600 border-blue-200'
                                         }`}
                                 >
                                     {entityType === 'program' ? 'Program' : 'University'}

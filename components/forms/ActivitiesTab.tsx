@@ -55,7 +55,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { useProfileData, type Activity } from '@/lib/profileStore';
+import { useProfileStore, type Activity } from '@/lib/profileStore';
 
 // Constants
 const ACTIVITY_TYPES = [
@@ -228,7 +228,7 @@ function SortableActivityCard({
 }
 
 export default function ActivitiesTab() {
-    const { data: profileData, setActivities: updateStoreActivities } = useProfileData();
+    const { data: profileData, setActivities: updateStoreActivities } = useProfileStore();
     const [activities, setActivities] = useState<Activity[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);

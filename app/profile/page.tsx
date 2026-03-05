@@ -14,7 +14,7 @@ import { EssaysTab } from '@/components/profile/EssaysTab';
 import { RecommendationsTab } from '@/components/profile/RecommendationsTab';
 import { ActivitiesSummaryTab } from '@/components/profile/ActivitiesSummaryTab';
 import { HonorsSummaryTab } from '@/components/profile/HonorsSummaryTab';
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileStore } from '@/lib/profileStore';
 import { Button } from '@/components/ui/button';
 import { ProfilePreviewModal } from '@/components/pdf/ProfilePreviewModal';
 
@@ -32,7 +32,7 @@ const profileTabs = [
 
 export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState('personal');
-    const { data } = useProfileData();
+    const { data } = useProfileStore();
     const [isClient, setIsClient] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
 

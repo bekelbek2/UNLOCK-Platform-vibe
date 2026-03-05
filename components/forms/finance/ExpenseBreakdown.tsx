@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Info, Calculator, TrendingDown, Home, ShoppingCart, Activity, GraduationCap, Receipt } from "lucide-react";
-import { useProfileData } from "@/lib/profileStore";
+import { useProfileStore } from "@/lib/profileStore";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -30,7 +30,7 @@ function formatCurrency(value: number) {
 
 export function ExpenseBreakdown({ }: ExpenseBreakdownProps) {
     const { control } = useFormContext();
-    const { data: profileData } = useProfileData();
+    const { data: profileData } = useProfileStore();
 
     // Calculate sibling count safely
     const siblingCount = profileData.family?.numberOfSiblings

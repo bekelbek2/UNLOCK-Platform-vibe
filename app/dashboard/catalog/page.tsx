@@ -1,40 +1,33 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import Header from '@/components/Header';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Search, GraduationCap, CalendarClock, BookOpen, Clock, DollarSign } from 'lucide-react';
-import { universities, type University, type ScholarshipType } from '@/data/universities';
-import { useProgramStore, type Program } from '@/lib/programStore';
-
-// ─── Scholarship Badge Helper ─────────────────────────────────────────────────
-const scholarshipConfig: Record<ScholarshipType, { label: string; className: string }> = {
-    'full-ride': { label: 'Full-Ride', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    'full-tuition': { label: 'Full-Tuition', className: 'bg-blue-50 text-blue-700 border-blue-200' },
-    partial: { label: 'Partial', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-    none: { label: 'No Scholarship', className: 'bg-gray-100 text-gray-500 border-gray-200' },
-};
+import { Search, GraduationCap, CalendarClock, BookOpen, Loader2 } from 'lucide-react';
+import { useUniversityStore, type University } from '@/lib/universityStore';
 
 // ─── University Card ──────────────────────────────────────────────────────────
 function UniversityCard({ university }: { university: University }) {
-    const scholarship = scholarshipConfig[university.scholarshipType];
-
     return (
         <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 group cursor-pointer border-gray-200">
             <div className="flex justify-center pt-6 pb-2">
                 <div className="w-16 h-16 rounded-md border border-gray-200 overflow-hidden bg-white flex items-center justify-center p-1">
-                    <img
-                        src={university.logoUrl}
-                        alt={`${university.name} logo`}
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                    />
+                    {university.logo_url ? (
+                        <img
+                            src={university.logo_url}
+                            alt={`${university.name} logo`}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                        />
+                    ) : (
+                        <GraduationCap className="w-8 h-8 text-gray-300" />
+                    )}
                 </div>
             </div>
 
@@ -45,55 +38,61 @@ function UniversityCard({ university }: { university: University }) {
                 <p className="text-sm text-gray-500 mt-0.5">{university.country}</p>
             </div>
 
-            <div className="px-6 mt-3">
-                <Badge className={`${scholarship.className} text-xs font-medium px-2.5 py-0.5`}>
-                    {scholarship.label}
-                </Badge>
-            </div>
-
             <div className="px-6 pb-6 mt-4 space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Rank</span>
-                    <span className="font-semibold text-gray-900">#{university.rank}</span>
-                </div>
-                <div className="w-full h-px bg-gray-100" />
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Tuition</span>
-                    <span className="font-semibold text-gray-900">{university.tuition}</span>
-                </div>
-                <div className="w-full h-px bg-gray-100" />
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Acceptance</span>
-                    <span className="font-semibold text-gray-900">{university.acceptanceRate}</span>
-                </div>
-                <div className="w-full h-px bg-gray-100" />
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                        <CalendarClock className="w-3.5 h-3.5" /> Deadline
-                    </span>
-                    <span className="font-semibold text-gray-900">{university.deadline}</span>
-                </div>
+                {university.rank && (
+                    <>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-500">Rank</span>
+                            <span className="font-semibold text-gray-900">#{university.rank}</span>
+                        </div>
+                        <div className="w-full h-px bg-gray-100" />
+                    </>
+                )}
+                {university.acceptance_rate && (
+                    <>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-500">Acceptance</span>
+                            <span className="font-semibold text-gray-900">{university.acceptance_rate}%</span>
+                        </div>
+                        <div className="w-full h-px bg-gray-100" />
+                    </>
+                )}
+                {university.website_url && (
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Website</span>
+                        <a
+                            href={university.website_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold text-[#e75e24] hover:underline truncate max-w-[160px]"
+                        >
+                            Visit →
+                        </a>
+                    </div>
+                )}
             </div>
         </Card>
     );
 }
 
 // ─── Program Card ─────────────────────────────────────────────────────────────
-function ProgramCard({ program }: { program: Program }) {
+function ProgramCard({ program }: { program: University }) {
     return (
         <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 group cursor-pointer border-gray-200">
             <div className="flex justify-center pt-6 pb-2">
                 <div className="w-16 h-16 rounded-md border border-gray-200 overflow-hidden bg-white flex items-center justify-center p-1">
-                    <img
-                        src={program.logoUrl}
-                        alt={`${program.name} logo`}
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).parentElement!.innerHTML =
-                                '<div class="w-full h-full flex items-center justify-center bg-purple-50 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>';
-                        }}
-                    />
+                    {program.logo_url ? (
+                        <img
+                            src={program.logo_url}
+                            alt={`${program.name} logo`}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                        />
+                    ) : (
+                        <BookOpen className="w-8 h-8 text-purple-300" />
+                    )}
                 </div>
             </div>
 
@@ -111,26 +110,19 @@ function ProgramCard({ program }: { program: Program }) {
             </div>
 
             <div className="px-6 pb-6 mt-4 space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" /> Duration
-                    </span>
-                    <span className="font-semibold text-gray-900">{program.duration}</span>
-                </div>
-                <div className="w-full h-px bg-gray-100" />
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                        <DollarSign className="w-3.5 h-3.5" /> Cost
-                    </span>
-                    <span className="font-semibold text-gray-900">{program.cost}</span>
-                </div>
-                <div className="w-full h-px bg-gray-100" />
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                        <CalendarClock className="w-3.5 h-3.5" /> Deadline
-                    </span>
-                    <span className="font-semibold text-gray-900">{program.deadline}</span>
-                </div>
+                {program.website_url && (
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Website</span>
+                        <a
+                            href={program.website_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold text-purple-600 hover:underline truncate max-w-[160px]"
+                        >
+                            Visit →
+                        </a>
+                    </div>
+                )}
             </div>
         </Card>
     );
@@ -138,7 +130,17 @@ function ProgramCard({ program }: { program: Program }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CatalogPage() {
-    const { programs } = useProgramStore();
+    const { universities: catalog } = useUniversityStore();
+
+    // Derived universities & programs
+    const universities = catalog.filter((row: University) => row.type === 'university');
+    const programs = catalog.filter((row: University) => row.type === 'program');
+
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const [uniSearch, setUniSearch] = useState('');
     const [progSearch, setProgSearch] = useState('');
 
@@ -148,7 +150,7 @@ export default function CatalogPage() {
         return universities.filter(
             (u) => u.name.toLowerCase().includes(q) || u.country.toLowerCase().includes(q)
         );
-    }, [uniSearch]);
+    }, [universities, uniSearch]);
 
     const filteredPrograms = useMemo(() => {
         if (!progSearch.trim()) return programs;
@@ -202,7 +204,23 @@ export default function CatalogPage() {
                             />
                         </div>
 
-                        {filteredUniversities.length > 0 ? (
+                        {!isMounted ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {[...Array(4)].map((_, i) => (
+                                    <Card key={i} className="p-6 animate-pulse border-gray-200">
+                                        <div className="flex justify-center mb-4">
+                                            <div className="w-16 h-16 rounded-md bg-gray-200" />
+                                        </div>
+                                        <div className="h-5 w-3/4 bg-gray-200 rounded mb-2 mx-auto" />
+                                        <div className="h-4 w-1/2 bg-gray-100 rounded mx-auto mb-4" />
+                                        <div className="space-y-3">
+                                            <div className="h-4 bg-gray-100 rounded" />
+                                            <div className="h-4 bg-gray-100 rounded" />
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : filteredUniversities.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {filteredUniversities.map((uni) => (
                                     <UniversityCard key={uni.id} university={uni} />
@@ -231,7 +249,19 @@ export default function CatalogPage() {
                             />
                         </div>
 
-                        {filteredPrograms.length > 0 ? (
+                        {!isMounted ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {[...Array(4)].map((_, i) => (
+                                    <Card key={i} className="p-6 animate-pulse border-gray-200">
+                                        <div className="flex justify-center mb-4">
+                                            <div className="w-16 h-16 rounded-md bg-gray-200" />
+                                        </div>
+                                        <div className="h-5 w-3/4 bg-gray-200 rounded mb-2 mx-auto" />
+                                        <div className="h-4 w-1/2 bg-gray-100 rounded mx-auto" />
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : filteredPrograms.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {filteredPrograms.map((prog) => (
                                     <ProgramCard key={prog.id} program={prog} />

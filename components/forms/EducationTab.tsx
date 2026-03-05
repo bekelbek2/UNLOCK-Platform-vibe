@@ -45,10 +45,10 @@ const COUNTRIES = [
     'Australia', 'Japan', 'China', 'India', 'Brazil', 'South Korea', 'Nigeria', 'Kenya'
 ];
 
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileStore } from '@/lib/profileStore';
 
 export default function EducationTab() {
-    const { data, updateEducation } = useProfileData();
+    const { data, updateEducation } = useProfileStore();
 
     const form = useForm<EducationFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

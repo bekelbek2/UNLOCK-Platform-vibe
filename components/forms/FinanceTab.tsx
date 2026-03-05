@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { DollarSign, TrendingUp, TrendingDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useProfileData, IncomeItem, AssetItem, OtherExpenseItem, DebtItem } from '@/lib/profileStore';
+import { useProfileStore, IncomeItem, AssetItem, OtherExpenseItem, DebtItem } from '@/lib/profileStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -290,7 +290,7 @@ function FinancialHeaderSummary({ control }: { control: any }) {
 // ─── Component ────────────────────────────────────────────────────────────
 
 export default function FinanceTab() {
-    const { data: profileData, updateFinance } = useProfileData();
+    const { data: profileData, updateFinance } = useProfileStore();
 
     // Initialize Form
     const form = useForm<FinanceFormData>({

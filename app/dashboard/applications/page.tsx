@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import Header from '@/components/Header';
 import { Input } from '@/components/ui/input';
@@ -25,10 +25,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useApplicationStore, type ApplicationStatus, type Application } from '@/lib/applicationStore';
-import { universities } from '@/data/universities';
-import { useProgramStore } from '@/lib/programStore';
 import AddApplicationModal from '@/components/applications/AddApplicationModal';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/lib/authStore';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<ApplicationStatus, { label: string; className: string }> = {
@@ -85,11 +84,8 @@ function ApplicationCard({
     app: Application;
     onDelete: (id: string) => void;
 }) {
-    const { programs } = useProgramStore();
+    const uni = app.university;
     const entityType = app.entityType ?? 'university';
-    const uni = entityType === 'university'
-        ? universities.find((u) => u.id === app.universityId)
-        : programs.find((p) => p.id === app.universityId);
     const statusCfg = STATUS_CONFIG[app.status];
     const progress = calcProgress(app);
 
@@ -123,9 +119,9 @@ function ApplicationCard({
                 {/* University Row */}
                 <div className="flex items-center gap-3 pr-8">
                     <div className="w-10 h-10 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
-                        {uni?.logoUrl ? (
+                        {uni?.logo_url ? (
                             <img
-                                src={uni.logoUrl}
+                                src={uni.logo_url}
                                 alt={app.universityName}
                                 className="w-full h-full object-contain p-0.5"
                                 onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
@@ -270,29 +266,39 @@ function ApplicationCard({
 
 // ─── Main Content ─────────────────────────────────────────────────────────────
 function ApplicationsContent() {
-    const { applications, removeApplication } = useApplicationStore();
+    const { applications, removeApplication, initialize, isLoading } = useApplicationStore();
     const [modalOpen, setModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [countryFilter, setCountryFilter] = useState('all');
 
+    const { user } = useAuthStore();
+    const [isMounted, setIsMounted] = useState(false);
+
+    // Initialize application store data after mount
+    useEffect(() => {
+        setIsMounted(true);
+        if (user) {
+            initialize(user.id);
+        }
+    }, [initialize, user]);
+
     const countries = useMemo(() => {
         const set = new Set<string>();
         applications.forEach((app) => {
-            const uni = universities.find((u) => u.id === app.universityId);
-            if (uni) set.add(uni.country);
+            if (app.university?.country) set.add(app.university.country);
+            else if (app.universityName) set.add('Unknown');
         });
         return Array.from(set).sort();
     }, [applications]);
 
     const filtered = useMemo(() => {
         return applications.filter((app) => {
-            const uni = universities.find((u) => u.id === app.universityId);
             const q = searchQuery.toLowerCase().trim();
-            if (q && !app.universityName.toLowerCase().includes(q) && !(uni?.country ?? '').toLowerCase().includes(q))
+            if (q && !app.universityName.toLowerCase().includes(q) && !(app.university?.country ?? '').toLowerCase().includes(q))
                 return false;
             if (statusFilter !== 'all' && app.status !== statusFilter) return false;
-            if (countryFilter !== 'all' && uni?.country !== countryFilter) return false;
+            if (countryFilter !== 'all' && app.university?.country !== countryFilter) return false;
             return true;
         });
     }, [applications, searchQuery, statusFilter, countryFilter]);
@@ -363,7 +369,27 @@ function ApplicationsContent() {
                 </div>
 
                 {/* Grid */}
-                {filtered.length > 0 ? (
+                {(!isMounted || isLoading) ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 animate-pulse">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-lg bg-gray-200" />
+                                    <div className="flex-1">
+                                        <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
+                                        <div className="h-3 w-1/2 bg-gray-100 rounded" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 mb-4">
+                                    <div className="h-5 w-16 bg-gray-100 rounded-full" />
+                                    <div className="h-5 w-20 bg-gray-100 rounded-full" />
+                                </div>
+                                <div className="h-1.5 w-full bg-gray-100 rounded-full mb-3" />
+                                <div className="h-8 w-full bg-gray-100 rounded-lg" />
+                            </div>
+                        ))}
+                    </div>
+                ) : filtered.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                         {filtered.map((app) => (
                             <ApplicationCard key={app.id} app={app} onDelete={handleDelete} />

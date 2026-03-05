@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useProfileData } from '../../lib/profileStore';
+import { useProfileStore } from '../../lib/profileStore';
 import { useDocumentStore } from '../../hooks/useDocumentStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -59,7 +59,7 @@ function RecPreview({ docId }: { docId: string }) {
 }
 
 export function RecommendationsTab() {
-    const { data, addRecommendation, removeRecommendation } = useProfileData();
+    const { data, addRecommendation, removeRecommendation } = useProfileStore();
     const { documents } = useDocumentStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
 

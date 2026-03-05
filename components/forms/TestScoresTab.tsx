@@ -121,10 +121,10 @@ interface TestScore extends TestScoreFormData {
     displayScore: string;
 }
 
-import { useProfileData } from '@/lib/profileStore';
+import { useProfileStore } from '@/lib/profileStore';
 
 export default function TestScoresTab() {
-    const { data: profileData, setTestScores: updateStoreTestScores } = useProfileData();
+    const { data: profileData, setTestScores: updateStoreTestScores } = useProfileStore();
     const [testScores, setTestScores] = useState<TestScore[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
