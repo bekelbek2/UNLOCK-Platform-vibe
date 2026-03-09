@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -63,12 +63,18 @@ interface StudentOption extends User {
     high_school_curriculum?: string | null;
 }
 
-export default function CreateStudyPlanPage() {
+export default function EditStudyPlanPage() {
     const router = useRouter();
+    const params = useParams();
+    const planId = params.id as string;
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [students, setStudents] = useState<StudentOption[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
     const [studentSearch, setStudentSearch] = useState('');
+
+    const { studyPlans, updateStudyPlan } = useStudyPlanStore();
+    const existingPlan = useMemo(() => studyPlans.find(p => p.id === planId), [studyPlans, planId]);
 
     // ─── Program Store ───────────────────────────────────────────────────────
     const { programs, lessons: allLessons } = useProgramStore();
@@ -112,6 +118,32 @@ export default function CreateStudyPlanPage() {
     useEffect(() => {
         setStudents(users.filter(u => u.role === 'student') as StudentOption[]);
     }, [users]);
+
+    // ─── Populate Existing Data ───────────────────────────────────────────────
+    useEffect(() => {
+        if (existingPlan && students.length > 0) {
+            const student = students.find((s) => s.id === existingPlan.studentId);
+            if (student) setSelectedStudent(student);
+
+            // Reconstruct assignedMentors object from array
+            const mentorsObj: Record<string, string> = {};
+            existingPlan.mentors.forEach(m => {
+                const mentorFound = mentors.find(admin => admin.full_name === m.mentorName);
+                if (mentorFound) mentorsObj[m.role] = mentorFound.id;
+            });
+
+            form.reset({
+                studentId: existingPlan.studentId,
+                studentName: existingPlan.studentName,
+                studentStats: existingPlan.studentStats,
+                programType: existingPlan.programType,
+                assignedMentors: mentorsObj,
+                selectedSessions: existingPlan.resolvedSessions.map(s => s.id),
+                xSessions: existingPlan.xSessions,
+                targets: existingPlan.targets || [],
+            });
+        }
+    }, [existingPlan, students, mentors, form]);
 
     // ─── Program-derived data ────────────────────────────────────────────────
     const selectedProgram = programs.find(p => p.id === programType);
@@ -197,12 +229,22 @@ export default function CreateStudyPlanPage() {
     // When program changes, auto-select appropriate sessions
     useEffect(() => {
         if (!programType) return;
-        // For non-flexible programs, all non-flexible lessons are automatically selected.
-        // For flexible programs, nothing is pre-selected.
-        const sessionIds = isFlexibleProgram ? [] : curriculumLessons.map(l => l.id);
+
+        let sessionIds: string[] = [];
+
+        if (existingPlan && programType === existingPlan.programType) {
+            // If the user hasn't changed the program from the original one,
+            // preserve the previously selected sessions.
+            sessionIds = existingPlan.resolvedSessions.map(s => s.id);
+        } else {
+            // For non-flexible programs, all non-flexible lessons are automatically selected.
+            // For flexible programs, nothing is pre-selected.
+            sessionIds = isFlexibleProgram ? [] : curriculumLessons.map(l => l.id);
+        }
+
         setValue('selectedSessions', sessionIds, { shouldValidate: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [programType, isFlexibleProgram, curriculumLessons]);
+    }, [programType, isFlexibleProgram, existingPlan, curriculumLessons.map(l => l.id).join(',')]);
 
     const handleSessionToggle = (lessonId: string, checked: boolean) => {
         // Only Ambulance allows toggling — others are locked
@@ -254,7 +296,7 @@ export default function CreateStudyPlanPage() {
                 resolvedSessions,
                 targets: data.targets?.map(t => ({
                     ...t,
-                    programId: uuidv4() // Assign random ID for the free-text program
+                    programId: t.programId || uuidv4() // Assign random ID if not present
                 })) || [],
                 totalHours,
                 totalPrice,
@@ -264,7 +306,7 @@ export default function CreateStudyPlanPage() {
             console.log(JSON.stringify(payload, null, 2));
 
             // Save to store
-            useStudyPlanStore.getState().addStudyPlan({
+            updateStudyPlan(planId, {
                 studentId: payload.studentId,
                 studentName: payload.studentName,
                 studentStats: payload.studentStats,
@@ -278,7 +320,7 @@ export default function CreateStudyPlanPage() {
                 totalPrice: payload.totalPrice,
             });
 
-            toast.success('Study plan saved successfully!');
+            toast.success('Study plan updated successfully!');
             setIsSubmitting(false);
 
             // Redirect back to main list
@@ -290,6 +332,14 @@ export default function CreateStudyPlanPage() {
         }
     };
 
+    if (!existingPlan || students.length === 0 || programs.length === 0) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+                <div className="text-gray-500 animate-pulse">Loading study plan data...</div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gray-50/50 pb-32">
             <header className="bg-white border-b border-gray-200 px-8 py-5 sticky top-0 z-20">
@@ -300,8 +350,8 @@ export default function CreateStudyPlanPage() {
                     <ChevronLeft className="w-3.5 h-3.5 mr-0.5" />
                     Back to Study Plans
                 </button>
-                <h1 className="text-2xl font-bold text-gray-900">Create Study Plan</h1>
-                <p className="text-gray-500 text-sm mt-1">Configure the student&apos;s curriculum mapping based on UNLOCK guidelines.</p>
+                <h1 className="text-2xl font-bold text-gray-900">Edit Study Plan</h1>
+                <p className="text-gray-500 text-sm mt-1">Modify the student&apos;s curriculum mapping based on UNLOCK guidelines.</p>
             </header>
 
             <main className="max-w-5xl mx-auto px-8 py-8 space-y-8">
@@ -780,7 +830,7 @@ export default function CreateStudyPlanPage() {
                         className="bg-[#C26E26] hover:bg-[#a65d1f] text-white h-12 px-8 font-semibold shadow-sm text-base"
                         disabled={isSubmitting || !programType}
                     >
-                        {isSubmitting ? 'Saving...' : 'Save Study Plan'}
+                        {isSubmitting ? 'Saving...' : 'Save Changes'}
                     </Button>
                 </div>
             </div>

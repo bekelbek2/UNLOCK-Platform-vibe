@@ -9,9 +9,11 @@ import { FileText, Plus, Search, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useStudyPlanStore, type StudyPlan } from '@/lib/studyPlanStore';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export default function AdminStudyPlansPage() {
     const { studyPlans, deleteStudyPlan } = useStudyPlanStore();
+    const router = useRouter();
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -87,7 +89,11 @@ export default function AdminStudyPlansPage() {
                                 </tr>
                             ) : (
                                 studyPlans.map((plan) => (
-                                    <tr key={plan.id} className="hover:bg-gray-50 transition-colors group">
+                                    <tr
+                                        key={plan.id}
+                                        onClick={() => router.push(`/admin/study-plans/${plan.id}`)}
+                                        className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                                    >
                                         <td className="px-6 py-4">
                                             <div className="font-semibold text-gray-900">{plan.studentName}</div>
                                             <div className="text-xs text-gray-500 mt-1">Grade {plan.studentStats.grade} • {plan.studentStats.targetMajor || 'Undecided'}</div>
@@ -119,7 +125,8 @@ export default function AdminStudyPlansPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     deleteStudyPlan(plan.id);
                                                     toast.success('Study plan deleted');
                                                 }}

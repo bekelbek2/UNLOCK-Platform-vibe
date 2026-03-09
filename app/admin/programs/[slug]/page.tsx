@@ -91,6 +91,8 @@ export default function ProgramDetailPage() {
     const [addOpen, setAddOpen] = useState(false);
     const [newName, setNewName] = useState('');
     const [newCategory, setNewCategory] = useState('');
+    const [isNewCategory, setIsNewCategory] = useState(false);
+    const [customCategory, setCustomCategory] = useState('');
     const [newDivision, setNewDivision] = useState('');
     const [newHours, setNewHours] = useState('1');
     const [newPrice, setNewPrice] = useState('0');
@@ -99,6 +101,8 @@ export default function ProgramDetailPage() {
     const resetAddForm = () => {
         setNewName('');
         setNewCategory('');
+        setIsNewCategory(false);
+        setCustomCategory('');
         setNewDivision('');
         setNewHours('1');
         setNewPrice('0');
@@ -107,9 +111,15 @@ export default function ProgramDetailPage() {
 
     const handleAdd = () => {
         if (!program || !newName.trim()) return;
+
+        let finalCategory = newCategory;
+        if (isNewCategory) {
+            finalCategory = customCategory.trim();
+        }
+
         addLesson({
             programId: program.id,
-            category: newCategory.trim() || 'Other',
+            category: finalCategory || 'Other',
             division: newDivision.trim() || 'General',
             name: newName.trim(),
             hours: Math.max(0, parseFloat(newHours) || 0),
@@ -124,6 +134,36 @@ export default function ProgramDetailPage() {
     const handleDelete = (id: string, name: string) => {
         deleteLesson(id);
         toast.success(`Deleted "${name}"`);
+    };
+
+    const [addRoleOpen, setAddRoleOpen] = useState(false);
+    const [newRoleName, setNewRoleName] = useState('');
+
+    const handleAddRole = () => {
+        if (!program || !newRoleName.trim()) return;
+
+        // Ensure no duplicate role names
+        const roleExists = program.mentorRoles?.some(r =>
+            r.role.toLowerCase() === newRoleName.trim().toLowerCase()
+        );
+        if (roleExists) {
+            toast.error('Role already exists');
+            return;
+        }
+
+        const newRoles = [...(program.mentorRoles || []), { role: newRoleName.trim(), mentorId: '' }];
+        updateProgram(program.id, { mentorRoles: newRoles });
+        setNewRoleName('');
+        setAddRoleOpen(false);
+        toast.success('Mentor role added');
+    };
+
+    const handleDeleteRole = (index: number) => {
+        if (!program || !program.mentorRoles) return;
+        const newRoles = [...program.mentorRoles];
+        newRoles.splice(index, 1);
+        updateProgram(program.id, { mentorRoles: newRoles });
+        toast.success('Mentor role removed');
     };
 
     if (!program) {
@@ -209,61 +249,50 @@ export default function ProgramDetailPage() {
                     </Card>
                 </div>
 
-                {/* Mentor Roles Section (only if program has mentorRoles) */}
-                {mounted && program.mentorRoles && program.mentorRoles.length > 0 && (
+                {/* Mentor Roles Section */}
+                {mounted && program.mentorRoles !== undefined && (
                     <Card className="border-gray-200 shadow-sm overflow-hidden mb-8">
-                        <div className="bg-gray-50/50 border-b border-gray-100 px-6 py-4">
-                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-[#C26E26]" />
-                                Assigned Mentors
-                            </h3>
-                            <p className="text-xs text-gray-500 mt-1">These mentors will appear automatically in every study plan using this program.</p>
+                        <div className="bg-gray-50/50 border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-[#C26E26]" />
+                                    Required Mentor Roles
+                                </h3>
+                                <p className="text-xs text-gray-500 mt-1">These roles will be added to any study plan using this program, where specific mentors can then be assigned.</p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => setAddRoleOpen(true)} className="text-[#C26E26] border-orange-200 hover:bg-orange-50 shrink-0">
+                                <Plus className="w-4 h-4 mr-1.5" />
+                                Add Role
+                            </Button>
                         </div>
                         <div className="p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {program.mentorRoles.map((mr, idx) => {
-                                    const mentor = mentors.find(m => m.id === mr.mentorId);
-                                    return (
-                                        <div key={mr.role} className="space-y-2">
-                                            <Label className="text-gray-600 text-xs font-semibold uppercase tracking-wider">{mr.role} Mentor</Label>
-                                            <Select
-                                                value={mr.mentorId || undefined}
-                                                onValueChange={(val) => {
-                                                    const newRoles = [...program.mentorRoles];
-                                                    newRoles[idx] = { ...newRoles[idx], mentorId: val };
-                                                    updateProgram(program.id, { mentorRoles: newRoles });
-                                                    toast.success(`${mr.role} mentor updated`);
-                                                }}
-                                            >
-                                                <SelectTrigger className="border-gray-200 focus:ring-[#C26E26]">
-                                                    <SelectValue placeholder="Select a mentor..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {mentors.map((m) => (
-                                                        <SelectItem key={m.id} value={m.id} className="py-2.5 px-3">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <span className="font-medium">{m.full_name}</span>
-                                                                <span className="text-xs text-gray-400">{m.email}</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {mentor && (
-                                                <div className="rounded-lg border border-violet-100 bg-violet-50/40 p-2.5 flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-                                                        <Shield className="w-3.5 h-3.5 text-violet-600" />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-semibold text-gray-900 truncate">{mentor.full_name}</p>
-                                                        <p className="text-xs text-gray-500 truncate">{mentor.email}</p>
-                                                    </div>
+                            {program.mentorRoles.length === 0 ? (
+                                <div className="text-center py-6 text-gray-500">
+                                    <Shield className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                                    <p className="text-sm font-medium text-gray-900">No mentor roles defined.</p>
+                                    <p className="text-xs mt-1">Add roles if this program requires specific mentors (e.g. Writing Mentor, Tech Mentor).</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {program.mentorRoles.map((mr, idx) => (
+                                        <div key={mr.role} className="relative group p-4 rounded-xl border border-gray-200 bg-white hover:border-[#C26E26]/50 hover:shadow-sm transition-all flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0">
+                                                    <Shield className="w-4 h-4 text-[#C26E26]" />
                                                 </div>
-                                            )}
+                                                <span className="font-semibold text-gray-900 text-sm truncate">{mr.role}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteRole(idx)}
+                                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity ml-2 shrink-0 p-1"
+                                                title="Remove Role"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </Card>
                 )}
@@ -431,15 +460,52 @@ export default function ProgramDetailPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Category</Label>
-                                <Select value={newCategory} onValueChange={setNewCategory}>
-                                    <SelectTrigger><SelectValue placeholder="Select or type..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {existingCategories.map((cat) => (
-                                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                        ))}
-                                        <SelectItem value="Other">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                {!isNewCategory ? (
+                                    <Select
+                                        value={newCategory}
+                                        onValueChange={(val) => {
+                                            if (val === 'create-new') {
+                                                setIsNewCategory(true);
+                                                setNewCategory('');
+                                            } else {
+                                                setNewCategory(val);
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {existingCategories.filter(c => c !== 'Other').map((cat) => (
+                                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                            ))}
+                                            <SelectItem value="Other">Other</SelectItem>
+                                            <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                                            <SelectItem value="create-new" className="text-[#C26E26] font-medium">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    Create New Category...
+                                                </div>
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <div className="relative">
+                                        <Input
+                                            value={customCategory}
+                                            onChange={(e) => setCustomCategory(e.target.value)}
+                                            placeholder="e.g. Test Prep"
+                                            autoFocus
+                                            className="pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setIsNewCategory(false); setCustomCategory(''); }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                            title="Cancel new category"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label>Division</Label>
@@ -490,6 +556,36 @@ export default function ProgramDetailPage() {
                             <Button type="submit" className="bg-[#C26E26] hover:bg-[#a65d1f] text-white" disabled={!newName.trim()}>
                                 <Plus className="w-4 h-4 mr-1" />
                                 Add Lesson
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add Role Dialog */}
+            <Dialog open={addRoleOpen} onOpenChange={setAddRoleOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Add Mentor Role</DialogTitle>
+                        <DialogDescription>Define a new mentor role category for this program (e.g., Essay Mentor, Tech Mentor).</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        onSubmit={(e) => { e.preventDefault(); handleAddRole(); }}
+                        className="space-y-4 mt-2"
+                    >
+                        <div className="space-y-2">
+                            <Label>Role Name <span className="text-red-500">*</span></Label>
+                            <Input
+                                value={newRoleName}
+                                onChange={(e) => setNewRoleName(e.target.value)}
+                                placeholder="e.g. Activity Mentor"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setAddRoleOpen(false)}>Cancel</Button>
+                            <Button type="submit" className="bg-[#C26E26] hover:bg-[#a65d1f] text-white" disabled={!newRoleName.trim()}>
+                                Add Role
                             </Button>
                         </div>
                     </form>

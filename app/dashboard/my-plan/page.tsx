@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useAuthStore } from '@/lib/authStore';
+import { useStudyPlanStore } from '@/lib/studyPlanStore';
+import { useUniversityStore } from '@/lib/universityStore';
 
 export interface StudyPlan {
     id: string;
@@ -10,37 +13,60 @@ export interface StudyPlan {
     totalPrice: number;
     status: 'New' | 'In Progress' | 'Completed';
     mentors: { id: string; name: string; skill: string; hours: string | number }[];
+    targets?: { universityId: string; universityName: string; programId: string; programName: string }[];
 }
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, ChevronRight, GraduationCap, MapPin, Sparkles, Star, User, BookOpen, Clock } from 'lucide-react';
+import { CheckCircle2, ChevronRight, GraduationCap, MapPin, Sparkles, Star, User, BookOpen, Clock, Building2, Target } from 'lucide-react';
 import MainLayout from '@/components/MainLayout';
 
 export default function StudentMyPlanPage() {
+    const user = useAuthStore(state => state.user);
+    const { studyPlans } = useStudyPlanStore();
+    const { universities } = useUniversityStore();
+
     const [plan, setPlan] = useState<StudyPlan | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchPlan = async () => {
             try {
-                // Mock delay
-                await new Promise(res => setTimeout(res, 500));
-
-                const mockPlan: StudyPlan = {
-                    id: 'plan-1',
-                    studentName: 'Demo Student',
-                    studentStats: { grade: '12', targetMajor: 'Computer Science' },
-                    programType: '360 Full-Support',
-                    totalPrice: 4500,
-                    status: 'In Progress',
-                    mentors: [
-                        { id: 'm1', name: 'Alina F.', skill: 'Strategic Admission', hours: 'Unlimited' },
-                        { id: 'm2', name: 'John D.', skill: 'Essay Writing', hours: 10 }
-                    ]
-                };
-
-                setPlan(mockPlan);
+                // Try finding real plan
+                const realPlan = studyPlans.find(p => p.studentId === user?.id);
+                if (realPlan) {
+                    const dashboardPlan: StudyPlan = {
+                        id: realPlan.id,
+                        studentName: realPlan.studentName,
+                        studentStats: { grade: realPlan.studentStats.grade || '', targetMajor: realPlan.studentStats.targetMajor || '' },
+                        programType: realPlan.programName || realPlan.programType || 'Custom Program',
+                        totalPrice: realPlan.totalPrice,
+                        status: realPlan.status,
+                        mentors: realPlan.mentors.map((m, i) => ({
+                            id: `m${i}`,
+                            name: m.mentorName,
+                            skill: m.role,
+                            hours: 'Included'
+                        })),
+                        targets: realPlan.targets || []
+                    };
+                    setPlan(dashboardPlan);
+                } else {
+                    await new Promise(res => setTimeout(res, 500));
+                    const mockPlan: StudyPlan = {
+                        id: 'plan-1',
+                        studentName: user?.full_name || 'Demo Student',
+                        studentStats: { grade: '12', targetMajor: 'Computer Science' },
+                        programType: '360 Full-Support',
+                        totalPrice: 4500,
+                        status: 'In Progress',
+                        mentors: [
+                            { id: 'm1', name: 'Alina F.', skill: 'Strategic Admission', hours: 'Unlimited' },
+                            { id: 'm2', name: 'John D.', skill: 'Essay Writing', hours: 10 }
+                        ]
+                    };
+                    setPlan(mockPlan);
+                }
             } catch (err) {
                 console.error(err);
             } finally {
@@ -48,8 +74,28 @@ export default function StudentMyPlanPage() {
             }
         };
 
-        fetchPlan();
-    }, []);
+        if (user) {
+            fetchPlan();
+        } else {
+            setLoading(false);
+        }
+    }, [user, studyPlans]);
+
+    const categorizedTargets = useMemo(() => {
+        if (!plan || !plan.targets) return null;
+        const categories = { Reach: [], Match: [], Safety: [], Uncategorized: [] } as Record<string, NonNullable<typeof plan.targets>>;
+        plan.targets.forEach(target => {
+            const uni = universities.find(u => u.id === target.universityId);
+            if (uni && uni.acceptance_rate !== null && uni.acceptance_rate !== undefined) {
+                if (uni.acceptance_rate < 20) categories.Reach.push(target);
+                else if (uni.acceptance_rate <= 50) categories.Match.push(target);
+                else categories.Safety.push(target);
+            } else {
+                categories.Uncategorized.push(target);
+            }
+        });
+        return categories;
+    }, [plan, universities]);
 
     if (loading) {
         return (
@@ -167,6 +213,49 @@ export default function StudentMyPlanPage() {
                         </div>
                     </section>
 
+                    {/* ─── Section B.5: Default Universities/Programs ───────────────────── */}
+                    {plan.targets && plan.targets.length > 0 && categorizedTargets && (
+                        <section>
+                            <div className="mb-10">
+                                <h2 className="text-sm font-bold tracking-widest text-[#C26E26] uppercase mb-3">Default Universities/Programs</h2>
+                                <h3 className="text-3xl font-bold text-gray-900">Your Strategic Selection.</h3>
+                                <p className="text-lg text-gray-500 mt-2 max-w-2xl">
+                                    We have carefully selected these institutions, categorizing them based on acceptance rates and your profile.
+                                </p>
+                            </div>
+                            <div className="space-y-8">
+                                {['Reach', 'Match', 'Safety', 'Uncategorized'].map(category => {
+                                    const items = categorizedTargets[category];
+                                    if (!items || items.length === 0) return null;
+                                    return (
+                                        <div key={category} className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
+                                            <h4 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                                                <Target className="w-6 h-6 text-[#C26E26]" />
+                                                {category} Selection
+                                                <Badge variant="secondary" className="bg-orange-50 text-[#C26E26]">{items.length}</Badge>
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {items.map((target, idx) => (
+                                                    <div key={idx} className="p-4 rounded-xl border border-gray-100 bg-gray-50 hover:border-[#C26E26]/30 transition-colors">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center shadow-sm flex-shrink-0">
+                                                                <Building2 className="w-5 h-5 text-gray-400" />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-900 leading-tight">{target.universityName}</h4>
+                                                                <p className="text-sm text-gray-500 mt-1">{target.programName}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
+
                     {/* ─── Section C: Curriculum & Deliverables ───────────────────────────── */}
                     <section className="bg-white rounded-3xl p-10 md:p-14 border border-gray-200 shadow-sm">
                         <div className="mb-10 text-center">
@@ -177,7 +266,7 @@ export default function StudentMyPlanPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                             {[
                                 'Strategic Admissions Positioning',
-                                'Target University Selection & Categorization',
+                                'Default Universities & Programs Categorization',
                                 'Personal Statement Ideation & Revisions',
                                 'Supplemental Essay Architecture',
                                 'Extracurricular Activities Optimization',

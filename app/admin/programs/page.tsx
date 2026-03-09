@@ -4,13 +4,48 @@ import Link from 'next/link';
 import { useProgramStore } from '@/lib/programStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Clock, DollarSign, ChevronRight, Layers } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { BookOpen, Clock, DollarSign, ChevronRight, Layers, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function AdminProgramsPage() {
-    const { programs, getLessonsByProgram, getTotalHours, getTotalPrice } = useProgramStore();
+    const { programs, getLessonsByProgram, getTotalHours, getTotalPrice, addProgram, deleteProgram } = useProgramStore();
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
+
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [newSlug, setNewSlug] = useState('');
+    const [newDesc, setNewDesc] = useState('');
+
+    const handleAdd = () => {
+        if (!newName.trim() || !newSlug.trim()) {
+            alert("Name and slug are required.");
+            return;
+        }
+        addProgram({
+            name: newName,
+            slug: newSlug.toLowerCase().replace(/\s+/g, '-'), // auto format slug just in case
+            description: newDesc,
+            mentorRoles: [], // default empty
+        });
+        setNewName('');
+        setNewSlug('');
+        setNewDesc('');
+        setIsAddOpen(false);
+    };
+
+    const handleDelete = (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.confirm('Are you sure you want to delete this program? All associated lessons will also be deleted. This cannot be undone.')) {
+            deleteProgram(id);
+        }
+    };
 
     const programMeta: Record<string, { color: string; gradient: string }> = {
         'prog-powder': { color: 'text-violet-600', gradient: 'from-violet-500 to-purple-600' },
@@ -21,11 +56,70 @@ export default function AdminProgramsPage() {
     return (
         <div className="min-h-screen bg-gray-50/50 p-8">
             {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
-                <p className="text-gray-500 text-sm mt-1">
-                    Manage UNLOCK program curriculums, lesson hours, and pricing.
-                </p>
+            <div className="mb-8 flex flex-row items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
+                    <p className="text-gray-500 text-sm mt-1">
+                        Manage UNLOCK program curriculums, lesson hours, and pricing.
+                    </p>
+                </div>
+
+                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                    <DialogTrigger asChild>
+                        <Button className="bg-[#C26E26] hover:bg-[#a85d1e] text-white">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Program
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Create New Program</DialogTitle>
+                            <DialogDescription>
+                                Add a new program framework to the system. You will be able to add curriculum lessons to it afterwards.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Program Name</Label>
+                                <Input
+                                    id="name"
+                                    placeholder="e.g. Early Admissions Boost"
+                                    value={newName}
+                                    onChange={(e) => {
+                                        setNewName(e.target.value);
+                                        // Auto-generate slug if it's currently empty or strictly following the name
+                                        if (!newSlug || newSlug === newName.slice(0, -1).toLowerCase().replace(/\s+/g, '-')) {
+                                            setNewSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'));
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="slug">URL Slug</Label>
+                                <Input
+                                    id="slug"
+                                    placeholder="e.g. early-admissions-boost"
+                                    value={newSlug}
+                                    onChange={(e) => setNewSlug(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="desc">Description</Label>
+                                <Textarea
+                                    id="desc"
+                                    placeholder="Brief description of who this program is for..."
+                                    value={newDesc}
+                                    onChange={(e) => setNewDesc(e.target.value)}
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                            <Button className="bg-[#C26E26] hover:bg-[#a85d1e] text-white" onClick={handleAdd}>Create Program</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             {/* Program Cards */}
@@ -59,7 +153,18 @@ export default function AdminProgramsPage() {
                                                     {program.description}
                                                 </p>
                                             </div>
-                                            <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-[#C26E26] group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+                                            <div className="flex flex-col items-center gap-2 mt-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={(e) => handleDelete(e, program.id)}
+                                                    title="Delete Program"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-[#C26E26] transition-all flex-shrink-0" />
+                                            </div>
                                         </div>
 
                                         {/* Stats */}

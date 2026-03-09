@@ -26,10 +26,12 @@ export interface Program {
 export interface ProgramState {
     programs: Program[];
     lessons: Lesson[];
+    addProgram: (program: Omit<Program, 'id'>) => void;
+    updateProgram: (id: string, updates: Partial<Program>) => void;
+    deleteProgram: (id: string) => void;
     addLesson: (lesson: Omit<Lesson, 'id'>) => void;
     updateLesson: (id: string, updates: Partial<Lesson>) => void;
     deleteLesson: (id: string) => void;
-    updateProgram: (id: string, updates: Partial<Program>) => void;
     getLessonsByProgram: (programId: string) => Lesson[];
     getTotalHours: (programId: string) => number;
     getTotalPrice: (programId: string) => number;
@@ -175,6 +177,27 @@ export const useProgramStore = create<ProgramState>()(
             programs: SEED_PROGRAMS,
             lessons: ALL_SEED_LESSONS,
 
+            addProgram: (program) =>
+                set((state) => ({
+                    programs: [
+                        ...state.programs,
+                        { ...program, id: crypto.randomUUID() },
+                    ],
+                })),
+
+            updateProgram: (id, updates) =>
+                set((state) => ({
+                    programs: state.programs.map((p) =>
+                        p.id === id ? { ...p, ...updates } : p
+                    ),
+                })),
+
+            deleteProgram: (id) =>
+                set((state) => ({
+                    programs: state.programs.filter((p) => p.id !== id),
+                    lessons: state.lessons.filter((l) => l.programId !== id),
+                })),
+
             addLesson: (lesson) =>
                 set((state) => ({
                     lessons: [
@@ -193,13 +216,6 @@ export const useProgramStore = create<ProgramState>()(
             deleteLesson: (id) =>
                 set((state) => ({
                     lessons: state.lessons.filter((l) => l.id !== id),
-                })),
-
-            updateProgram: (id, updates) =>
-                set((state) => ({
-                    programs: state.programs.map((p) =>
-                        p.id === id ? { ...p, ...updates } : p
-                    ),
                 })),
 
             getLessonsByProgram: (programId) =>

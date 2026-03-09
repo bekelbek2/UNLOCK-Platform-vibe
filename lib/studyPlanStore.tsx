@@ -15,6 +15,13 @@ export interface StudyPlanXSession {
     hours: number;
 }
 
+export interface StudyPlanTarget {
+    universityId: string;
+    universityName: string;
+    programId: string; // The specific university program they are applying to
+    programName: string;
+}
+
 export interface StudyPlan {
     id: string;
     studentId: string;
@@ -30,6 +37,7 @@ export interface StudyPlan {
     mentors: { role: string; mentorName: string }[];
     resolvedSessions: StudyPlanSession[];
     xSessions: StudyPlanXSession[];
+    targets?: StudyPlanTarget[];
     totalHours: number;
     totalPrice: number;
     status: 'New' | 'In Progress' | 'Completed';
@@ -39,6 +47,7 @@ export interface StudyPlan {
 interface StudyPlanState {
     studyPlans: StudyPlan[];
     addStudyPlan: (plan: Omit<StudyPlan, 'id' | 'createdAt' | 'status'>) => void;
+    updateStudyPlan: (id: string, updates: Partial<Omit<StudyPlan, 'id' | 'createdAt'>>) => void;
     updateStudyPlanStatus: (id: string, status: StudyPlan['status']) => void;
     deleteStudyPlan: (id: string) => void;
 }
@@ -59,6 +68,13 @@ export const useStudyPlanStore = create<StudyPlanState>()(
                         },
                         ...state.studyPlans,
                     ],
+                })),
+
+            updateStudyPlan: (id, updates) =>
+                set((state) => ({
+                    studyPlans: state.studyPlans.map((p) =>
+                        p.id === id ? { ...p, ...updates } : p
+                    ),
                 })),
 
             updateStudyPlanStatus: (id, status) =>
