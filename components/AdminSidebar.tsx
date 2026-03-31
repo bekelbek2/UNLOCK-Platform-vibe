@@ -15,6 +15,7 @@ import {
     LogOut,
     Loader2,
     Layers,
+    Building2,
 } from 'lucide-react';
 
 const adminNavItems = [
@@ -23,6 +24,7 @@ const adminNavItems = [
     { name: 'Universities', href: '/admin/universities', icon: GraduationCap },
     { name: 'Programs', href: '/admin/programs', icon: Layers },
     { name: 'Study Plans', href: '/admin/study-plans', icon: BookOpen },
+    { name: 'Applications', href: '/admin/applications', icon: Building2 },
     { name: 'Mentors & Admins', href: '/admin/mentors', icon: Shield },
 ];
 
