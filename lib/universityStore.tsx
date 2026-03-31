@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { generateId } from './generateId';
 
 export interface University {
     id: string;
@@ -206,7 +207,7 @@ export const useUniversityStore = create<UniversityState>()(
                     ...state.universities,
                     {
                         ...uni,
-                        id: crypto.randomUUID(),
+                        id: generateId(),
                         created_at: new Date().toISOString()
                     }
                 ]

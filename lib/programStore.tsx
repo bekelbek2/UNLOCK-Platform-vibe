@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { generateId } from './generateId';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface Lesson {
@@ -181,7 +182,7 @@ export const useProgramStore = create<ProgramState>()(
                 set((state) => ({
                     programs: [
                         ...state.programs,
-                        { ...program, id: crypto.randomUUID() },
+                        { ...program, id: generateId() },
                     ],
                 })),
 
@@ -202,7 +203,7 @@ export const useProgramStore = create<ProgramState>()(
                 set((state) => ({
                     lessons: [
                         ...state.lessons,
-                        { ...lesson, id: crypto.randomUUID() },
+                        { ...lesson, id: generateId() },
                     ],
                 })),
 

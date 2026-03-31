@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { User, UserRole } from './authStore';
+import { generateId } from './generateId';
 
 export interface SystemState {
     users: User[];
@@ -147,7 +148,7 @@ export const useSystemStore = create<SystemState>()(
                     ...state.users,
                     {
                         ...user,
-                        id: crypto.randomUUID(),
+                        id: generateId(),
                     }
                 ]
             })),

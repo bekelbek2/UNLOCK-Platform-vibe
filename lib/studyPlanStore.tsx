@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { generateId } from './generateId';
 
 export interface StudyPlanSession {
     id: string;
@@ -62,7 +63,7 @@ export const useStudyPlanStore = create<StudyPlanState>()(
                     studyPlans: [
                         {
                             ...plan,
-                            id: crypto.randomUUID(),
+                            id: generateId(),
                             status: 'New',
                             createdAt: new Date().toISOString(),
                         },

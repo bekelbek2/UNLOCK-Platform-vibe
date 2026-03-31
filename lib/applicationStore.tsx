@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { University } from './universityStore';
+import { generateId } from './generateId';
 
 export type ApplicationStatus = 'Planning' | 'In Progress' | 'Submitted';
 
@@ -54,11 +55,8 @@ export const useApplicationStore = create<ApplicationStore>()(
             },
 
             addApplication: async (app, universityData) => {
-                const userId = get().userId;
-                if (!userId) return;
-
                 const newApp: Application = {
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     universityId: app.universityId || '',
                     universityName: app.universityName || '',
                     entityType: app.entityType || 'university',
@@ -107,7 +105,7 @@ export const useApplicationStore = create<ApplicationStore>()(
                             ...a,
                             supplements: [
                                 ...a.supplements,
-                                { id: crypto.randomUUID(), title, linkedDocumentId: null }
+                                { id: generateId(), title, linkedDocumentId: null }
                             ]
                         };
                     })

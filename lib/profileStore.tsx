@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { generateId } from './generateId';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface Honor {
@@ -157,7 +158,7 @@ export const useProfileStore = create<ProfileStoreProps>()(
             setHonors: (honors) => set((state) => ({ data: { ...state.data, honors } })),
 
             addActivity: (activity) => set((state) => ({
-                data: { ...state.data, activities: [...state.data.activities, { id: crypto.randomUUID(), ...activity }] }
+                data: { ...state.data, activities: [...state.data.activities, { id: generateId(), ...activity }] }
             })),
             removeActivity: (id) => set((state) => ({
                 data: { ...state.data, activities: state.data.activities.filter((a) => a.id !== id) }
@@ -170,7 +171,7 @@ export const useProfileStore = create<ProfileStoreProps>()(
             })),
 
             addHonor: (honor) => set((state) => ({
-                data: { ...state.data, honors: [...state.data.honors, { id: crypto.randomUUID(), ...honor }] }
+                data: { ...state.data, honors: [...state.data.honors, { id: generateId(), ...honor }] }
             })),
             removeHonor: (id) => set((state) => ({
                 data: { ...state.data, honors: state.data.honors.filter((h) => h.id !== id) }
@@ -187,35 +188,35 @@ export const useProfileStore = create<ProfileStoreProps>()(
             })),
 
             addIncome: (item) => set((state) => ({
-                data: { ...state.data, finance: { ...state.data.finance, incomes: [...state.data.finance.incomes, { id: crypto.randomUUID(), ...item }] } }
+                data: { ...state.data, finance: { ...state.data.finance, incomes: [...state.data.finance.incomes, { id: generateId(), ...item }] } }
             })),
             removeIncome: (id) => set((state) => ({
                 data: { ...state.data, finance: { ...state.data.finance, incomes: state.data.finance.incomes.filter((i) => i.id !== id) } }
             })),
 
             addAsset: (item) => set((state) => ({
-                data: { ...state.data, finance: { ...state.data.finance, assets: [...state.data.finance.assets, { id: crypto.randomUUID(), ...item }] } }
+                data: { ...state.data, finance: { ...state.data.finance, assets: [...state.data.finance.assets, { id: generateId(), ...item }] } }
             })),
             removeAsset: (id) => set((state) => ({
                 data: { ...state.data, finance: { ...state.data.finance, assets: state.data.finance.assets.filter((i) => i.id !== id) } }
             })),
 
             addOtherExpense: (item) => set((state) => ({
-                data: { ...state.data, finance: { ...state.data.finance, otherExpenses: [...state.data.finance.otherExpenses, { id: crypto.randomUUID(), ...item }] } }
+                data: { ...state.data, finance: { ...state.data.finance, otherExpenses: [...state.data.finance.otherExpenses, { id: generateId(), ...item }] } }
             })),
             removeOtherExpense: (id) => set((state) => ({
                 data: { ...state.data, finance: { ...state.data.finance, otherExpenses: state.data.finance.otherExpenses.filter((i) => i.id !== id) } }
             })),
 
             addDebt: (item) => set((state) => ({
-                data: { ...state.data, finance: { ...state.data.finance, debts: [...state.data.finance.debts, { id: crypto.randomUUID(), ...item }] } }
+                data: { ...state.data, finance: { ...state.data.finance, debts: [...state.data.finance.debts, { id: generateId(), ...item }] } }
             })),
             removeDebt: (id) => set((state) => ({
                 data: { ...state.data, finance: { ...state.data.finance, debts: state.data.finance.debts.filter((i) => i.id !== id) } }
             })),
 
             addEssay: (title, linkedDocumentId) => set((state) => ({
-                data: { ...state.data, essays: [...state.data.essays, { id: crypto.randomUUID(), title, linkedDocumentId }] }
+                data: { ...state.data, essays: [...state.data.essays, { id: generateId(), title, linkedDocumentId }] }
             })),
             removeEssay: (id) => set((state) => ({
                 data: { ...state.data, essays: state.data.essays.filter((e) => e.id !== id) }
@@ -225,7 +226,7 @@ export const useProfileStore = create<ProfileStoreProps>()(
             })),
 
             addRecommendation: (title, linkedDocumentId) => set((state) => ({
-                data: { ...state.data, recommendations: [...state.data.recommendations, { id: crypto.randomUUID(), title, linkedDocumentId }] }
+                data: { ...state.data, recommendations: [...state.data.recommendations, { id: generateId(), title, linkedDocumentId }] }
             })),
             removeRecommendation: (id) => set((state) => ({
                 data: { ...state.data, recommendations: state.data.recommendations.filter((r) => r.id !== id) }
@@ -240,7 +241,7 @@ export const useProfileStore = create<ProfileStoreProps>()(
                         family: {
                             ...state.data.family,
                             parents: [...currentParents, {
-                                id: crypto.randomUUID(),
+                                id: generateId(),
                                 relationship: '',
                                 firstName: '',
                                 lastName: '',
