@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -29,19 +29,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useApplicationStore } from '@/lib/applicationStore';
-import { useUniversityStore, type University } from '@/lib/universityStore';
+import { useUniversityStore, type University, type DeadlineRound } from '@/lib/universityStore';
 import { toast } from 'sonner';
-import { ArrowLeft, GraduationCap, BookOpen, Loader2 } from 'lucide-react';
+import { ArrowLeft, GraduationCap, BookOpen, CalendarClock, Clock, AlertCircle } from 'lucide-react';
 
 const termOptions = ['Fall 2025', 'Spring 2026', 'Fall 2026', 'Spring 2027'];
-
-const admissionPlanOptions = [
-    'Regular Decision',
-    'Early Action',
-    'Early Decision I',
-    'Early Decision II',
-    'Rolling Admission',
-];
 
 interface SelectedEntity {
     type: 'university' | 'program';
@@ -53,21 +45,39 @@ interface AddApplicationModalProps {
     onOpenChange: (open: boolean) => void;
 }
 
+function formatDate(iso: string): string {
+    if (!iso) return '—';
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default function AddApplicationModal({ open, onOpenChange }: AddApplicationModalProps) {
     const { addApplication } = useApplicationStore();
 
     const [selected, setSelected] = useState<SelectedEntity | null>(null);
     const [term, setTerm] = useState('Fall 2026');
-    const [admissionPlan, setAdmissionPlan] = useState('Regular Decision');
+    const [selectedRoundId, setSelectedRoundId] = useState<string>('');
 
     const { universities: catalog } = useUniversityStore();
 
-    // Derived universities & programs
     const universities = catalog.filter((row: University) => row.type === 'university');
     const programs = catalog.filter((row: University) => row.type === 'program');
 
-    const handleSelect = (entity: SelectedEntity) => setSelected(entity);
-    const handleBack = () => setSelected(null);
+    const availableRounds = useMemo(() => {
+        return selected?.data.deadlines ?? [];
+    }, [selected]);
+
+    const selectedRound = useMemo(() => {
+        return availableRounds.find(r => r.id === selectedRoundId) ?? null;
+    }, [availableRounds, selectedRoundId]);
+
+    const handleSelect = (entity: SelectedEntity) => {
+        setSelected(entity);
+        setSelectedRoundId('');
+    };
+    const handleBack = () => {
+        setSelected(null);
+        setSelectedRoundId('');
+    };
 
     const handleSubmit = async () => {
         if (!selected) return;
@@ -77,24 +87,27 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
             universityId: entity.id,
             universityName: entity.name,
             entityType: selected.type,
-            deadline: '',
+            deadline: selectedRound?.date ?? '',
+            unlockDeadline: selectedRound?.unlockDate ?? '',
+            deadlineRoundId: selectedRound?.id ?? '',
+            deadlineRoundName: selectedRound?.name ?? '',
+            admissionPlan: selectedRound?.name ?? '',
             term,
-            admissionPlan,
         }, entity);
 
         toast.success(`${entity.name} added to your applications!`);
 
         setSelected(null);
+        setSelectedRoundId('');
         setTerm('Fall 2026');
-        setAdmissionPlan('Regular Decision');
         onOpenChange(false);
     };
 
     const handleClose = (isOpen: boolean) => {
         if (!isOpen) {
             setSelected(null);
+            setSelectedRoundId('');
             setTerm('Fall 2026');
-            setAdmissionPlan('Regular Decision');
         }
         onOpenChange(isOpen);
     };
@@ -175,11 +188,17 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                                         </p>
                                                         <p className="text-sm text-gray-500">{uni.country}</p>
                                                     </div>
-                                                    {uni.rank && (
-                                                        <span className="text-xs text-gray-400 flex-shrink-0">
-                                                            #{uni.rank}
-                                                        </span>
-                                                    )}
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        {(uni.deadlines?.length ?? 0) > 0 && (
+                                                            <Badge variant="secondary" className="text-[9px] gap-0.5">
+                                                                <CalendarClock className="w-2.5 h-2.5" />
+                                                                {uni.deadlines!.length}
+                                                            </Badge>
+                                                        )}
+                                                        {uni.rank && (
+                                                            <span className="text-xs text-gray-400">#{uni.rank}</span>
+                                                        )}
+                                                    </div>
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
@@ -257,7 +276,7 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                 <DialogTitle className="text-xl">Configure Application</DialogTitle>
                             </div>
                             <DialogDescription className="text-gray-500 ml-10">
-                                Set your term and admission plan.
+                                Set your term and deadline round.
                             </DialogDescription>
                         </DialogHeader>
 
@@ -311,21 +330,60 @@ export default function AddApplicationModal({ open, onOpenChange }: AddApplicati
                                 </Select>
                             </div>
 
-                            {/* Admission Plan */}
+                            {/* Deadline Round Picker */}
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">
-                                    Admission Plan
+                                    Deadline Round
                                 </Label>
-                                <Select value={admissionPlan} onValueChange={setAdmissionPlan}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select admission plan" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {admissionPlanOptions.map((p) => (
-                                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                {availableRounds.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {availableRounds.map((round) => {
+                                            const isSelected = selectedRoundId === round.id;
+                                            return (
+                                                <button
+                                                    key={round.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedRoundId(round.id)}
+                                                    className={`w-full text-left p-3.5 rounded-lg border-2 transition-all duration-150 ${isSelected
+                                                        ? 'border-[#e75e24] bg-orange-50/50 shadow-sm'
+                                                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className={`text-sm font-semibold ${isSelected ? 'text-[#e75e24]' : 'text-gray-900'}`}>
+                                                            {round.name}
+                                                        </span>
+                                                        {isSelected && (
+                                                            <span className="w-2 h-2 rounded-full bg-[#e75e24]" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-xs">
+                                                        <span className="flex items-center gap-1 text-gray-500">
+                                                            <Clock className="w-3 h-3" />
+                                                            {formatDate(round.date)}
+                                                        </span>
+                                                        {round.unlockDate && (
+                                                            <span className="flex items-center gap-1 text-[#e75e24]">
+                                                                <CalendarClock className="w-3 h-3" />
+                                                                UNLOCK: {formatDate(round.unlockDate)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-lg flex items-start gap-3">
+                                        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm text-amber-800 font-medium">No deadline rounds configured</p>
+                                            <p className="text-xs text-amber-600 mt-0.5">
+                                                Ask your admin to add deadline rounds to this {selected.type === 'program' ? 'program' : 'university'} in the catalog.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

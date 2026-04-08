@@ -13,8 +13,11 @@ export interface Application {
     universityName: string;
     entityType: 'university' | 'program';
     term: string;
-    admissionPlan: string;
-    deadline: string;
+    admissionPlan: string;          // kept for backward compat, = deadlineRoundName
+    deadline: string;               // real university deadline (ISO date)
+    unlockDeadline: string;         // UNLOCK review deadline (ISO date)
+    deadlineRoundId: string;        // id of the selected DeadlineRound
+    deadlineRoundName: string;      // "Early Decision I", "Regular", etc.
     status: ApplicationStatus;
     createdAt: string;
     majors: { firstChoice: string; secondChoice: string };
@@ -61,8 +64,11 @@ export const useApplicationStore = create<ApplicationStore>()(
                     universityName: app.universityName || '',
                     entityType: app.entityType || 'university',
                     term: app.term || '',
-                    admissionPlan: app.admissionPlan || '',
+                    admissionPlan: app.admissionPlan || app.deadlineRoundName || '',
                     deadline: app.deadline || '',
+                    unlockDeadline: app.unlockDeadline || '',
+                    deadlineRoundId: app.deadlineRoundId || '',
+                    deadlineRoundName: app.deadlineRoundName || app.admissionPlan || '',
                     status: 'Planning',
                     createdAt: new Date().toISOString(),
                     majors: { firstChoice: '', secondChoice: '' },

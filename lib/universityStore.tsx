@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { generateId } from './generateId';
 
+export interface DeadlineRound {
+    id: string;
+    name: string;           // "Early Decision I", "Regular", "Rolling", etc.
+    date: string;           // ISO date — the real university deadline
+    unlockDate: string;     // ISO date — UNLOCK's earlier review deadline
+}
+
 export interface University {
     id: string;
     name: string;
@@ -14,6 +21,7 @@ export interface University {
     acceptance_rate?: number | null;
     type: 'university' | 'program';
     tags: string[];
+    deadlines?: DeadlineRound[];
     created_at?: string;
 }
 

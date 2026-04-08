@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useUniversityStore } from '@/lib/universityStore';
+import { useUniversityStore, type DeadlineRound } from '@/lib/universityStore';
+import { generateId } from '@/lib/generateId';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,7 +55,9 @@ import {
     Upload,
     X,
     ImageIcon,
+    CalendarClock,
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
@@ -98,6 +101,9 @@ export default function AdminUniversitiesPage() {
     const [logoError, setLogoError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Deadline rounds state
+    const [deadlineRounds, setDeadlineRounds] = useState<DeadlineRound[]>([]);
+
     const form = useForm<FormValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(formSchema) as any,
@@ -133,6 +139,7 @@ export default function AdminUniversitiesPage() {
         setLogoFile(null);
         setLogoPreview(null);
         setLogoError(null);
+        setDeadlineRounds([]);
         form.reset({
             type: activeTab,
             name: '',
@@ -150,6 +157,7 @@ export default function AdminUniversitiesPage() {
         setLogoFile(null);
         setLogoPreview(row.logo_url ?? null);
         setLogoError(null);
+        setDeadlineRounds(row.deadlines ?? []);
         form.reset({
             type: row.type,
             name: row.name,
@@ -159,6 +167,17 @@ export default function AdminUniversitiesPage() {
             acceptance_rate: row.acceptance_rate ?? 0,
         });
         setDialogOpen(true);
+    };
+
+    // ─── Deadline round helpers ───────────────────────────────────────────────
+    const addDeadlineRound = () => {
+        setDeadlineRounds(prev => [...prev, { id: generateId(), name: '', date: '', unlockDate: '' }]);
+    };
+    const updateDeadlineRound = (id: string, field: keyof DeadlineRound, value: string) => {
+        setDeadlineRounds(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+    };
+    const removeDeadlineRound = (id: string) => {
+        setDeadlineRounds(prev => prev.filter(r => r.id !== id));
     };
 
     // ─── Logo file handler ───────────────────────────────────────────────────
@@ -194,6 +213,8 @@ export default function AdminUniversitiesPage() {
     // ─── Submit (Create or Update) ───────────────────────────────────────────
     const onSubmit = (values: FormValues) => {
         setSaving(true);
+        // Filter out incomplete deadline rounds
+        const validDeadlines = deadlineRounds.filter(r => r.name.trim() && r.date);
 
         try {
             if (editingRow) {
@@ -201,6 +222,7 @@ export default function AdminUniversitiesPage() {
                     ...values,
                     rank: values.type === 'university' ? (values.rank || null) : null,
                     acceptance_rate: values.type === 'university' ? (values.acceptance_rate || null) : null,
+                    deadlines: validDeadlines,
                 });
                 toast.success(`${values.name} updated successfully!`);
             } else {
@@ -211,6 +233,7 @@ export default function AdminUniversitiesPage() {
                     rank: values.type === 'university' ? (values.rank || null) : null,
                     acceptance_rate: values.type === 'university' ? (values.acceptance_rate || null) : null,
                     tags: [],
+                    deadlines: validDeadlines,
                 });
                 toast.success(`${values.name} added to catalog!`);
             }
@@ -221,6 +244,7 @@ export default function AdminUniversitiesPage() {
         setSaving(false);
         setDialogOpen(false);
         setEditingRow(null);
+        setDeadlineRounds([]);
         form.reset();
     };
 
@@ -277,6 +301,16 @@ export default function AdminUniversitiesPage() {
             <TableCell>
                 {row.acceptance_rate ? (
                     <span className="text-sm text-gray-600">{row.acceptance_rate}%</span>
+                ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                )}
+            </TableCell>
+            <TableCell>
+                {(row.deadlines?.length ?? 0) > 0 ? (
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                        <CalendarClock className="w-3 h-3" />
+                        {row.deadlines!.length}
+                    </Badge>
                 ) : (
                     <span className="text-sm text-gray-400">—</span>
                 )}
@@ -457,6 +491,7 @@ export default function AdminUniversitiesPage() {
                                 <TableHead>Country</TableHead>
                                 <TableHead className="w-[80px]">Rank</TableHead>
                                 <TableHead className="w-[100px]">Acceptance</TableHead>
+                                <TableHead className="w-[90px]">Deadlines</TableHead>
                                 <TableHead className="w-[100px]">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -667,7 +702,66 @@ export default function AdminUniversitiesPage() {
                                 </div>
                             )}
 
-
+                            {/* ── Deadline Rounds ── */}
+                            <div className="space-y-3 pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-sm font-medium">Deadline Rounds</Label>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs gap-1"
+                                        onClick={addDeadlineRound}
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                        Add Round
+                                    </Button>
+                                </div>
+                                {deadlineRounds.length === 0 && (
+                                    <p className="text-xs text-gray-400 italic">No deadline rounds added yet. Click &quot;Add Round&quot; to create one.</p>
+                                )}
+                                {deadlineRounds.map((round) => (
+                                    <div key={round.id} className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                        <div className="flex-1 space-y-2">
+                                            <Input
+                                                placeholder="Round name (e.g. Early Decision I)"
+                                                value={round.name}
+                                                onChange={(e) => updateDeadlineRound(round.id, 'name', e.target.value)}
+                                                className="h-8 text-sm bg-white"
+                                            />
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Real Deadline</span>
+                                                    <Input
+                                                        type="date"
+                                                        value={round.date}
+                                                        onChange={(e) => updateDeadlineRound(round.id, 'date', e.target.value)}
+                                                        className="h-8 text-sm bg-white"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] font-semibold text-[#e75e24] uppercase tracking-wider">UNLOCK Deadline</span>
+                                                    <Input
+                                                        type="date"
+                                                        value={round.unlockDate}
+                                                        onChange={(e) => updateDeadlineRound(round.id, 'unlockDate', e.target.value)}
+                                                        className="h-8 text-sm bg-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0 mt-0.5"
+                                            onClick={() => removeDeadlineRound(round.id)}
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
 
                             <DialogFooter className="pt-2 gap-3">
                                 <Button

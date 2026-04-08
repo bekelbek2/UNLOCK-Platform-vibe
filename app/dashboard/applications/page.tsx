@@ -23,6 +23,7 @@ import {
     Trash2,
     CheckCircle2,
     CircleDashed,
+    CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useApplicationStore, type ApplicationStatus, type Application } from '@/lib/applicationStore';
@@ -77,6 +78,13 @@ function calcProgress(app: Application): number {
     return Math.round((score / max) * 100);
 }
 
+function formatDeadlineDate(iso: string): string {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // ─── Application Card ────────────────────────────────────────────────────────
 function ApplicationCard({
     app,
@@ -93,6 +101,10 @@ function ApplicationCard({
     const deadlineDate = parseDeadline(app.deadline);
     const daysLeft = deadlineDate ? daysUntil(deadlineDate) : null;
     const urgentDeadline = daysLeft !== null && daysLeft <= 14;
+
+    const unlockDate = parseDeadline(app.unlockDeadline ?? '');
+    const unlockDaysLeft = unlockDate ? daysUntil(unlockDate) : null;
+    const urgentUnlock = unlockDaysLeft !== null && unlockDaysLeft <= 14;
 
     // Checklist logic
     const isMajorsDone = !!app.majors?.firstChoice;
@@ -156,27 +168,40 @@ function ApplicationCard({
                     >
                         {statusCfg.label}
                     </Badge>
-                    <span className="text-gray-300">•</span>
-                    <span className="text-sm text-gray-500 font-medium">{app.admissionPlan}</span>
+                    {app.deadlineRoundName && (
+                        <>
+                            <span className="text-gray-300">•</span>
+                            <span className="text-sm text-gray-500 font-medium">{app.deadlineRoundName}</span>
+                        </>
+                    )}
                 </div>
 
-                {/* Deadline Row */}
-                {app.deadline && (
-                    <div
-                        className={`flex items-center gap-2 text-sm font-medium ${urgentDeadline ? 'text-red-500' : 'text-gray-500'
-                            }`}
-                    >
-                        <Clock className="w-4 h-4 flex-shrink-0" />
-                        <span>{app.deadline}</span>
-                        {daysLeft !== null && (
-                            <span
-                                className={`ml-2 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${urgentDeadline
-                                    ? 'bg-red-100 text-red-600'
-                                    : 'bg-gray-100 text-gray-500'
-                                    }`}
-                            >
-                                {daysLeft <= 0 ? 'Past' : `${daysLeft}d`}
-                            </span>
+                {/* Deadlines Row */}
+                {(app.deadline || app.unlockDeadline) && (
+                    <div className="space-y-1.5">
+                        {app.unlockDeadline && (
+                            <div className={`flex items-center gap-2 text-sm font-medium ${urgentUnlock ? 'text-red-500' : 'text-[#e75e24]'}`}>
+                                <CalendarClock className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-xs font-semibold uppercase tracking-wider">UNLOCK</span>
+                                <span>{formatDeadlineDate(app.unlockDeadline)}</span>
+                                {unlockDaysLeft !== null && (
+                                    <span className={`ml-auto px-2 py-0.5 rounded-full text-[11px] font-semibold ${urgentUnlock ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-[#e75e24]'}`}>
+                                        {unlockDaysLeft <= 0 ? 'Past' : `${unlockDaysLeft}d`}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {app.deadline && (
+                            <div className={`flex items-center gap-2 text-sm font-medium ${urgentDeadline ? 'text-red-500' : 'text-gray-500'}`}>
+                                <Clock className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-xs font-semibold uppercase tracking-wider">Official</span>
+                                <span>{formatDeadlineDate(app.deadline)}</span>
+                                {daysLeft !== null && (
+                                    <span className={`ml-auto px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${urgentDeadline ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                                        {daysLeft <= 0 ? 'Past' : `${daysLeft}d`}
+                                    </span>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}

@@ -24,7 +24,7 @@ const adminNavItems = [
     { name: 'Universities', href: '/admin/universities', icon: GraduationCap },
     { name: 'Programs', href: '/admin/programs', icon: Layers },
     { name: 'Study Plans', href: '/admin/study-plans', icon: BookOpen },
-    { name: 'Applications', href: '/admin/applications', icon: Building2 },
+    { name: 'My Students', href: '/admin/applications', icon: Users },
     { name: 'Mentors & Admins', href: '/admin/mentors', icon: Shield },
 ];
 

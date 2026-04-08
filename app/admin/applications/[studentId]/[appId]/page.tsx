@@ -1,47 +1,26 @@
 'use client';
 
-import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/MainLayout';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import {
-    ChevronLeft,
-    GraduationCap,
-    Calendar,
-    FileText,
-    Pencil,
-    Plus,
-    Trash2,
-    Link as LinkIcon,
-    FileOutput,
-    Clock,
-    CalendarClock,
-    BookOpen,
-    ExternalLink,
-    CheckCircle2,
-    Circle,
-} from 'lucide-react';
+import { ChevronLeft, GraduationCap, FileText, Pencil, Link as LinkIcon, FileOutput, Clock, CalendarClock, BookOpen, ExternalLink, CheckCircle2, Circle, Eye } from 'lucide-react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 
-import { useApplicationStore } from '@/lib/applicationStore';
+import { Label } from '@/components/ui/label';
+
+import { useApplicationStore, type ApplicationStatus } from '@/lib/applicationStore';
 import { useDocumentStore } from '@/hooks/useDocumentStore';
-import { ApplicationPDFModal } from '@/components/applications/ApplicationPDFModal';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { Badge } from '@/components/ui/badge';
 
-// ─── Available Majors ─────────────────────────────────────────────────────────
-const MAJORS = [
-    'Computer Science', 'Business Administration', 'Biology', 'Psychology',
-    'Economics', 'Mechanical Engineering', 'Electrical Engineering', 'Nursing',
-    'Law', 'Medicine', 'Mathematics', 'Physics', 'Undecided',
-];
+// ─── Status Config ──────────────────────────────────────────────────
+const STATUS_CONFIG: Record<ApplicationStatus, { label: string; className: string }> = {
+    Planning: { label: 'Planning', className: 'bg-gray-100 text-gray-600 border-gray-200' },
+    'In Progress': { label: 'In Progress', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+    Submitted: { label: 'Submitted', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatDate(iso: string): string {
@@ -90,34 +69,28 @@ function DocumentPreview({ docId }: { docId: string }) {
 }
 
 // ─── Main Workspace Content ───────────────────────────────────────────────────
-function WorkspaceContent() {
+export default function AdminApplicationDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const appId = params.id as string;
+    const studentId = params.studentId as string;
+    const appId = params.appId as string;
 
-    const { applications, updateMajors, addSupplement, removeSupplement, linkSupplement } =
-        useApplicationStore();
+    const { applications } = useApplicationStore();
     const { documents } = useDocumentStore();
 
     const application = applications.find((a) => a.id === appId);
     const uni = application?.university;
     const entityType = application?.entityType ?? 'university';
 
-    const [newSupplementTitle, setNewSupplementTitle] = useState('');
-    const [isPDFOpen, setIsPDFOpen] = useState(false);
-    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-    const [linkingSupplementId, setLinkingSupplementId] = useState<string | null>(null);
-    const [selectedDocId, setSelectedDocId] = useState<string>('');
-
     if (!application) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
                 <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
                     <GraduationCap className="w-8 h-8 text-gray-300" />
                 </div>
                 <p className="text-gray-500 mb-4 font-medium">Application not found.</p>
-                <Button variant="outline" onClick={() => router.push('/dashboard/applications')}>
-                    Return to Applications
+                <Button variant="outline" onClick={() => router.push(`/admin/applications/${studentId}`)}>
+                    Return to Student Applications
                 </Button>
             </div>
         );
@@ -131,38 +104,7 @@ function WorkspaceContent() {
     // Deadline data
     const unlockDays = daysUntil(application.unlockDeadline ?? '');
     const officialDays = daysUntil(application.deadline ?? '');
-
-    // Handlers
-    const handleMajorChange = (field: 'firstChoice' | 'secondChoice', val: string) => {
-        updateMajors(appId, { ...application.majors, [field]: val });
-    };
-
-    const handleAddSupplement = () => {
-        if (!newSupplementTitle.trim()) return;
-        addSupplement(appId, newSupplementTitle.trim());
-        setNewSupplementTitle('');
-        toast.success('Supplement prompt added.');
-    };
-
-    const openLinkModal = (suppId: string) => {
-        setLinkingSupplementId(suppId);
-        setSelectedDocId('');
-        setIsLinkModalOpen(true);
-    };
-
-    const handleSaveLink = () => {
-        if (!linkingSupplementId || !selectedDocId) return;
-        linkSupplement(appId, linkingSupplementId, selectedDocId);
-        toast.success('Document linked!');
-        setIsLinkModalOpen(false);
-        setLinkingSupplementId(null);
-        setSelectedDocId('');
-    };
-
-    const handleUnlink = (suppId: string) => {
-        linkSupplement(appId, suppId, null);
-        toast('Document unlinked.');
-    };
+    const statusCfg = STATUS_CONFIG[application.status];
 
     return (
         <div className="min-h-screen bg-[#faf9f7]">
@@ -170,11 +112,11 @@ function WorkspaceContent() {
             <header className="bg-white border-b border-gray-200/80 px-8 py-6 sticky top-0 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 {/* Breadcrumb */}
                 <button
-                    onClick={() => router.push('/dashboard/applications')}
+                    onClick={() => router.push(`/admin/applications/${studentId}`)}
                     className="inline-flex items-center text-xs font-medium text-gray-400 hover:text-[#e75e24] transition-colors mb-3 group"
                 >
                     <ChevronLeft className="w-3.5 h-3.5 mr-0.5 transition-transform group-hover:-translate-x-0.5" />
-                    Back to Applications
+                    Back to Student Applications
                 </button>
 
                 <div className="flex items-center justify-between gap-6">
@@ -204,6 +146,10 @@ function WorkspaceContent() {
                                     {entityType === 'program' ? 'Program' : 'University'}
                                 </Badge>
                                 <span className="text-xs text-gray-400">•</span>
+                                <Badge className={`${statusCfg.className} text-[10px] font-semibold px-2 py-0 border`}>
+                                    {statusCfg.label}
+                                </Badge>
+                                <span className="text-xs text-gray-400">•</span>
                                 <span className="text-xs text-gray-500 font-medium">{application.term}</span>
                                 {application.deadlineRoundName && (
                                     <>
@@ -215,15 +161,11 @@ function WorkspaceContent() {
                         </div>
                     </div>
 
-                    {/* Right: PDF button */}
-                    <Button
-                        onClick={() => setIsPDFOpen(true)}
-                        variant="outline"
-                        className="gap-2 flex-shrink-0 border-[#e75e24]/30 text-[#e75e24] hover:bg-[#e75e24] hover:text-white hover:border-[#e75e24] transition-all"
-                    >
-                        <FileOutput className="w-4 h-4" />
-                        Export PDF
-                    </Button>
+                    {/* Right: Read-Only Badge */}
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-600 border-gray-200 text-xs font-semibold px-3 py-1 flex-shrink-0 gap-1.5 h-8">
+                        <Eye className="w-3.5 h-3.5" />
+                        View Only
+                    </Badge>
                 </div>
             </header>
 
@@ -284,49 +226,30 @@ function WorkspaceContent() {
                         </div>
                         <div className="flex-1">
                             <h2 className="text-sm font-bold text-gray-900">Academic Preferences</h2>
-                            <p className="text-xs text-gray-400">Your intended majors for this application</p>
+                            <p className="text-xs text-gray-400">Student's intended majors for this application</p>
                         </div>
                         {isMajorsDone && (
                             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                         )}
                     </div>
                     <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
                                 First Choice Major
                             </Label>
-                            <Select
-                                value={application.majors.firstChoice}
-                                onValueChange={(v) => handleMajorChange('firstChoice', v)}
-                            >
-                                <SelectTrigger className="w-full h-11 bg-[#faf9f7] border-gray-200 hover:border-[#e75e24]/40 transition-colors">
-                                    <SelectValue placeholder="Select a major…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {MAJORS.map((m) => (
-                                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                                {application.majors.firstChoice || <span className="text-gray-400 italic font-normal">Not selected</span>}
+                            </p>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                Second Choice <span className="text-gray-300 font-normal normal-case">(Optional)</span>
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                                Second Choice
                             </Label>
-                            <Select
-                                value={application.majors.secondChoice}
-                                onValueChange={(v) => handleMajorChange('secondChoice', v)}
-                            >
-                                <SelectTrigger className="w-full h-11 bg-[#faf9f7] border-gray-200 hover:border-[#e75e24]/40 transition-colors">
-                                    <SelectValue placeholder="Select a major…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {MAJORS.map((m) => (
-                                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                                {application.majors.secondChoice && application.majors.secondChoice !== 'none'
+                                    ? application.majors.secondChoice
+                                    : <span className="text-gray-400 italic font-normal">None</span>}
+                            </p>
                         </div>
                     </div>
                 </section>
@@ -340,7 +263,7 @@ function WorkspaceContent() {
                         </div>
                         <div className="flex-1">
                             <h2 className="text-sm font-bold text-gray-900">Writing Supplements</h2>
-                            <p className="text-xs text-gray-400">Add prompts and link your essay documents</p>
+                            <p className="text-xs text-gray-400">Essays linked to this application</p>
                         </div>
                         {totalSupplements > 0 && (
                             <div className="flex items-center gap-2">
@@ -357,36 +280,14 @@ function WorkspaceContent() {
                         )}
                     </div>
 
-                    <div className="p-6 space-y-4">
-                        {/* Add prompt bar */}
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 relative">
-                                <Input
-                                    placeholder="Add a new prompt (e.g. Why Us? — 250 words)"
-                                    value={newSupplementTitle}
-                                    onChange={(e) => setNewSupplementTitle(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSupplement()}
-                                    className="h-11 bg-[#faf9f7] border-gray-200 pl-4 pr-4 focus-visible:ring-[#e75e24]/30 focus-visible:border-[#e75e24]/40"
-                                />
-                            </div>
-                            <Button
-                                onClick={handleAddSupplement}
-                                disabled={!newSupplementTitle.trim()}
-                                className="h-11 bg-[#e75e24] hover:bg-[#c24e1b] text-white flex-shrink-0 px-5 shadow-sm disabled:opacity-40"
-                            >
-                                <Plus className="w-4 h-4 mr-1.5" />
-                                Add
-                            </Button>
-                        </div>
-
+                    <div className="p-6 space-y-4 bg-[#faf9f7]/50">
                         {/* Empty state */}
                         {application.supplements.length === 0 && (
-                            <div className="py-12 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-[#faf9f7]/50">
+                            <div className="py-12 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200">
                                 <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-3">
                                     <FileText className="w-6 h-6 text-gray-300" />
                                 </div>
-                                <p className="text-sm font-medium text-gray-500 mb-1">No prompts yet</p>
-                                <p className="text-xs text-gray-400">Type a prompt title above and click Add</p>
+                                <p className="text-sm font-medium text-gray-500 mb-1">No prompts added by student.</p>
                             </div>
                         )}
 
@@ -402,8 +303,8 @@ function WorkspaceContent() {
                                     key={supp.id}
                                     className={`group rounded-xl border transition-all duration-200 ${isLinked
                                         ? 'border-emerald-200 bg-emerald-50/30'
-                                        : 'border-gray-200 bg-[#faf9f7]/50 hover:border-[#e75e24]/30'
-                                    }`}
+                                        : 'border-gray-200 bg-white'
+                                        }`}
                                 >
                                     {/* Prompt header */}
                                     <div className="flex items-center gap-3 px-5 py-3.5">
@@ -423,13 +324,6 @@ function WorkspaceContent() {
                                                     <Circle className="w-3 h-3" /> Pending
                                                 </span>
                                             )}
-                                            <button
-                                                onClick={() => removeSupplement(appId, supp.id)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-red-50 text-gray-300 hover:text-red-500"
-                                                title="Remove prompt"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
                                         </div>
                                     </div>
 
@@ -445,43 +339,30 @@ function WorkspaceContent() {
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-medium text-gray-900 truncate">{linkedDoc?.title ?? 'Unknown Document'}</p>
                                                     </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Link href={`/dashboard/documents/${supp.linkedDocumentId}`}>
-                                                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-[#e75e24] hover:text-[#c24e1b] hover:bg-[#e75e24]/5">
-                                                                <Pencil className="w-3 h-3" />
-                                                                Edit
-                                                            </Button>
-                                                        </Link>
-                                                        <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-400 hover:text-gray-600" onClick={() => openLinkModal(supp.id)}>
-                                                            Swap
+                                                    <a
+                                                        href={`/dashboard/documents/${supp.linkedDocumentId}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="ml-auto"
+                                                    >
+                                                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800">
+                                                            <ExternalLink className="w-3 h-3" />
+                                                            Open Document
                                                         </Button>
-                                                        <button
-                                                            onClick={() => handleUnlink(supp.id)}
-                                                            className="p-1.5 rounded-md hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                                                            title="Unlink"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
+                                                    </a>
                                                 </div>
                                                 {/* Preview */}
                                                 <DocumentPreview docId={supp.linkedDocumentId as string} />
                                             </div>
                                         ) : (
-                                            <button
-                                                onClick={() => openLinkModal(supp.id)}
-                                                className="w-full py-8 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white hover:border-[#e75e24]/40 hover:bg-[#e75e24]/[0.02] transition-all cursor-pointer group/link"
-                                            >
-                                                <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover/link:bg-[#e75e24]/10 flex items-center justify-center mb-2.5 transition-colors">
-                                                    <LinkIcon className="w-5 h-5 text-gray-300 group-hover/link:text-[#e75e24] transition-colors" />
+                                            <div className="w-full py-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-[#faf9f7]">
+                                                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center mb-2">
+                                                    <FileText className="w-4 h-4 text-gray-300" />
                                                 </div>
-                                                <p className="text-sm font-medium text-gray-500 group-hover/link:text-gray-700 transition-colors">
-                                                    Link a document
+                                                <p className="text-sm font-medium text-gray-500">
+                                                    No document linked
                                                 </p>
-                                                <p className="text-xs text-gray-400 mt-0.5">
-                                                    Choose an essay from your Documents workspace
-                                                </p>
-                                            </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -490,100 +371,6 @@ function WorkspaceContent() {
                     </div>
                 </section>
             </main>
-
-            {/* ── Link Document Modal ── */}
-            <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
-                <DialogContent className="max-w-md p-0 overflow-hidden">
-                    <DialogHeader className="px-6 pt-6 pb-4">
-                        <DialogTitle className="text-lg flex items-center gap-2">
-                            <LinkIcon className="w-4 h-4 text-[#e75e24]" />
-                            Link Document
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-500 text-sm">
-                            Select an essay from your workspace.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="px-6 pb-4">
-                        <div className="border border-gray-200 rounded-xl overflow-hidden max-h-[280px] overflow-y-auto">
-                            {documents.length === 0 ? (
-                                <div className="p-10 text-center">
-                                    <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                        <FileText className="w-6 h-6 text-gray-300" />
-                                    </div>
-                                    <p className="text-sm text-gray-500 mb-4">No documents yet.</p>
-                                    <Link href="/dashboard/documents">
-                                        <Button variant="outline" size="sm" className="gap-1.5">
-                                            <ExternalLink className="w-3 h-3" />
-                                            Go to Documents
-                                        </Button>
-                                    </Link>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-gray-100">
-                                    {documents.map((doc) => (
-                                        <button
-                                            key={doc.id}
-                                            type="button"
-                                            onClick={() => setSelectedDocId(doc.id)}
-                                            className={`w-full text-left p-4 flex items-center gap-3 transition-all ${selectedDocId === doc.id
-                                                ? 'bg-[#e75e24]/5 border-l-[3px] border-l-[#e75e24]'
-                                                : 'border-l-[3px] border-l-transparent hover:bg-gray-50'
-                                            }`}
-                                        >
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${selectedDocId === doc.id ? 'bg-[#e75e24]/10 text-[#e75e24]' : 'bg-gray-100 text-gray-400'}`}>
-                                                <FileText className="w-4 h-4" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-medium truncate ${selectedDocId === doc.id ? 'text-[#e75e24]' : 'text-gray-900'}`}>
-                                                    {doc.title}
-                                                </p>
-                                                <p className="text-[11px] text-gray-400">
-                                                    {new Date(doc.lastModified).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                </p>
-                                            </div>
-                                            {selectedDocId === doc.id && (
-                                                <CheckCircle2 className="w-4 h-4 text-[#e75e24] flex-shrink-0" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter className="px-6 pb-6 gap-3">
-                        <Button variant="outline" onClick={() => setIsLinkModalOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSaveLink}
-                            disabled={!selectedDocId}
-                            className="bg-[#e75e24] hover:bg-[#c24e1b] text-white disabled:opacity-40"
-                        >
-                            Link Document
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* ── PDF Preview Modal ── */}
-            {isPDFOpen && (
-                <ApplicationPDFModal
-                    isOpen={isPDFOpen}
-                    onClose={() => setIsPDFOpen(false)}
-                    application={application}
-                />
-            )}
         </div>
-    );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-export default function ApplicationWorkspacePage() {
-    return (
-        <MainLayout>
-            <WorkspaceContent />
-        </MainLayout>
     );
 }
